@@ -1,7 +1,14 @@
 package com.larrydevincarter.thufir.clients;
 
 import com.larrydevincarter.thufir.models.dtos.MarketStatusDto;
+import com.larrydevincarter.thufir.models.dtos.UpdateStatusDto;
+import com.larrydevincarter.thufir.services.OptionScannerUpdateMonitor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import java.time.LocalTime;
 import java.util.Map;
@@ -9,26 +16,139 @@ import java.util.Map;
 @Component
 public class MarketStatusClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final String endpointUrl = "http://localhost:8081/api/market-status";
+    private static final Logger log = LoggerFactory.getLogger(MarketStatusClient.class);
 
+    private final RestTemplate restTemplate = new RestTemplate();
+    private final OptionScannerUpdateMonitor updateMonitor;
+
+    private final String endpointUrl = "http://localhost:8081/api/market-status";
+    private final String updateStatusUrl = "http://localhost:8081/api/update-status";
+
+    private static final int MAX_RETRIES = 5;
+    private static final long INITIAL_RETRY_DELAY_MS = 10000;  // 10 seconds initial
+    private static final double BACKOFF_MULTIPLIER = 2.0;     // Exponential backoff
+    private static final long POLL_INTERVAL_MS = 60_000;  // 1 minute between polls
+    private static final int MAX_POLL_ATTEMPTS = 60;
+
+    public MarketStatusClient(OptionScannerUpdateMonitor updateMonitor) {
+        this.updateMonitor = updateMonitor;
+    }
 
     public MarketStatusDto getStatus() {
+        if (updateMonitor.isPotentiallyUpdating()) {
+            waitForUpdateComplete();
+        }
+
+        return fetchMarketStatusWithRetry();
+    }
+
+    private void waitForUpdateComplete() {
+        int attempts = 0;
+        while (attempts < MAX_POLL_ATTEMPTS) {
+            attempts++;
+            UpdateStatusDto updateStatus = checkUpdateStatus();
+
+            if (updateStatus != null && !updateStatus.isUpdating()) {
+                log.info("OptionScanner database update completed — proceeding with calls");
+                updateMonitor.clearUpdateFlag();  // Stop checking until tomorrow
+                return;
+            }
+
+            log.info("OptionScanner is still updating (attempt {}/{}) — waiting {} ms before recheck",
+                    attempts, MAX_POLL_ATTEMPTS, POLL_INTERVAL_MS);
+            try {
+                Thread.sleep(POLL_INTERVAL_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Interrupted while waiting for OptionScanner update completion");
+                return;
+            }
+        }
+
+        log.warn("Max poll attempts reached — OptionScanner still updating. Proceeding cautiously.");
+    }
+
+    private UpdateStatusDto checkUpdateStatus() {
         try {
-            Map<String, Object> response = restTemplate.getForObject(endpointUrl, Map.class);
-            MarketStatusDto status = new MarketStatusDto();
-            status.setTradingDay(Boolean.TRUE.equals(response.get("isTradingDay")));
-            status.setTodayCloseTime((String) response.getOrDefault("todayCloseTime", "15:00"));
-            return status;
+            ResponseEntity<UpdateStatusDto> response = restTemplate.exchange(
+                    updateStatusUrl,
+                    HttpMethod.GET,
+                    null,
+                    UpdateStatusDto.class
+            );
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                log.debug("Update status check successful: isUpdating={}", response.getBody().isUpdating());
+                return response.getBody();
+            } else {
+                log.warn("Unexpected status {} from update-status endpoint", response.getStatusCode());
+                return null;
+            }
         } catch (Exception e) {
-            MarketStatusDto fallback = new MarketStatusDto();
-            fallback.setTradingDay(false);
-            fallback.setTodayCloseTime("15:00");
-            return fallback;
+            log.warn("Failed to check OptionScanner update status: {}", e.getMessage());
+            return null;
         }
     }
 
+    private MarketStatusDto fetchMarketStatusWithRetry() {
+        int attempt = 0;
+        long delayMs = INITIAL_RETRY_DELAY_MS;
+
+        while (attempt < MAX_RETRIES) {
+            attempt++;
+            try {
+                ResponseEntity<MarketStatusDto> response = restTemplate.exchange(
+                        endpointUrl,
+                        HttpMethod.GET,
+                        null,
+                        MarketStatusDto.class
+                );
+
+                HttpStatusCode statusCode = response.getStatusCode();
+                if (statusCode == HttpStatus.OK && response.getBody() != null) {
+                    log.info("Successfully fetched market status from OptionScanner on attempt {} (200 OK)", attempt);
+                    return response.getBody();
+                } else if (statusCode == HttpStatus.SERVICE_UNAVAILABLE) {  // 503
+                    log.warn("OptionScanner returned 503 on attempt {} — retrying in {} ms", attempt, delayMs);
+                } else {
+                    log.warn("Unexpected status {} from OptionScanner on attempt {} — retrying in {} ms", statusCode, attempt, delayMs);
+                }
+
+            } catch (HttpClientErrorException e) {
+                if (e.getStatusCode() == HttpStatus.SERVICE_UNAVAILABLE) {
+                    log.warn("OptionScanner 503 on attempt {} — retrying in {} ms", attempt, delayMs);
+                } else {
+                    log.warn("HTTP error {} on attempt {} — retrying in {} ms", e.getStatusCode(), attempt, delayMs);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to reach OptionScanner on attempt {} ({}: {}) — retrying in {} ms",
+                        attempt, e.getClass().getSimpleName(), e.getMessage(), delayMs);
+            }
+
+            if (attempt < MAX_RETRIES) {
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    log.error("Retry sleep interrupted");
+                    throw new RuntimeException("Interrupted while retrying market status fetch", ie);
+                }
+                delayMs = (long) (delayMs * BACKOFF_MULTIPLIER);  // Exponential backoff
+            }
+        }
+
+        log.error("All {} retry attempts failed — assuming NOT a trading day to prioritize safety", MAX_RETRIES);
+        MarketStatusDto emergency = new MarketStatusDto();
+        emergency.setTradingDay(false);
+        emergency.setTodayCloseTime("15:00");
+        return emergency;
+    }
+
     public LocalTime parseCloseTime(String timeStr) {
+        if (timeStr == null || timeStr.isBlank()) {
+            log.warn("Invalid close time string — defaulting to 15:00");
+            return LocalTime.of(15, 0);
+        }
         return LocalTime.parse(timeStr);
     }
 }

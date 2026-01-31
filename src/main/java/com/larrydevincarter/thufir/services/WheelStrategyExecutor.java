@@ -33,6 +33,8 @@ public class WheelStrategyExecutor {
         this.decisionRepo = decisionRepository;
     }
 
+//    @Scheduled(fixedRate = 600000000)
+    @Scheduled(cron = "0 25 8 * * MON-FRI", zone = "America/Chicago")
     public void startDailyWheelCycles() {
         ZoneId cst = ZoneId.of("America/Chicago");
         LocalDateTime now = LocalDateTime.now(cst);
