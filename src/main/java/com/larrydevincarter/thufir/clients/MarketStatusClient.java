@@ -3,6 +3,7 @@ package com.larrydevincarter.thufir.clients;
 import com.larrydevincarter.thufir.models.dtos.MarketStatusDto;
 import com.larrydevincarter.thufir.models.dtos.UpdateStatusDto;
 import com.larrydevincarter.thufir.services.OptionScannerUpdateMonitor;
+import com.larrydevincarter.thufir.utils.OptionScannerClientUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -36,58 +37,10 @@ public class MarketStatusClient {
 
     public MarketStatusDto getStatus() {
         if (updateMonitor.isPotentiallyUpdating()) {
-            waitForUpdateComplete();
+            OptionScannerClientUtils.waitForUpdateComplete(updateMonitor);
         }
 
         return fetchMarketStatusWithRetry();
-    }
-
-    private void waitForUpdateComplete() {
-        int attempts = 0;
-        while (attempts < MAX_POLL_ATTEMPTS) {
-            attempts++;
-            UpdateStatusDto updateStatus = checkUpdateStatus();
-
-            if (updateStatus != null && !updateStatus.isUpdating()) {
-                log.info("OptionScanner database update completed — proceeding with calls");
-                updateMonitor.clearUpdateFlag();  // Stop checking until tomorrow
-                return;
-            }
-
-            log.info("OptionScanner is still updating (attempt {}/{}) — waiting {} ms before recheck",
-                    attempts, MAX_POLL_ATTEMPTS, POLL_INTERVAL_MS);
-            try {
-                Thread.sleep(POLL_INTERVAL_MS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("Interrupted while waiting for OptionScanner update completion");
-                return;
-            }
-        }
-
-        log.warn("Max poll attempts reached — OptionScanner still updating. Proceeding cautiously.");
-    }
-
-    private UpdateStatusDto checkUpdateStatus() {
-        try {
-            ResponseEntity<UpdateStatusDto> response = restTemplate.exchange(
-                    updateStatusUrl,
-                    HttpMethod.GET,
-                    null,
-                    UpdateStatusDto.class
-            );
-
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                log.debug("Update status check successful: isUpdating={}", response.getBody().isUpdating());
-                return response.getBody();
-            } else {
-                log.warn("Unexpected status {} from update-status endpoint", response.getStatusCode());
-                return null;
-            }
-        } catch (Exception e) {
-            log.warn("Failed to check OptionScanner update status: {}", e.getMessage());
-            return null;
-        }
     }
 
     private MarketStatusDto fetchMarketStatusWithRetry() {

@@ -2,6 +2,7 @@ package com.larrydevincarter.thufir.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.larrydevincarter.thufir.clients.MarketStatusClient;
+import com.larrydevincarter.thufir.clients.VolatilityClient;
 import com.larrydevincarter.thufir.models.dtos.MarketStatusDto;
 import com.larrydevincarter.thufir.models.entities.TradeDecision;
 import com.larrydevincarter.thufir.repositories.TradeDecisionRepository;
@@ -50,12 +51,6 @@ public class WheelStrategyExecutor {
         log.info("Trading day detected — Thufir starting cycles. Close time: {}", marketClose);
 
         while (true) {
-            LocalDateTime current = LocalDateTime.now(cst);
-
-            if (current.toLocalTime().isAfter(marketClose) || current.toLocalTime().equals(marketClose)) {
-                log.info("Market close reached ({}) — Thufir ending cycles.", marketClose);
-                break;
-            }
 
             executeSingleWheelCycle();
 
@@ -78,22 +73,29 @@ public class WheelStrategyExecutor {
                 """
                 Current date/time: %s
                 
-                Perform a full wheel strategy cycle:
-                1. Assess current account positions, cash, and existing wheel legs.
-                2. Scan for new cash-secured put opportunities (use available tools/data).
-                3. Evaluate risk/reward with explicit probabilities and expected values.
-                4. Decide next action: enter new put, roll, close, or hold.
+                Before any trading decision, you MUST check current VIX level using available tools (getCurrentVix).
+                If VIX > 30, immediately output a halt decision and do not proceed with wheel analysis.
                 
-                Prioritize capital preservation. Halt if VIX >30 or drawdown >10%%.
+                Perform a full wheel strategy cycle:
+                1. Fetch current VIX using getCurrentVix tool.
+                2. If VIX > 30 or fetch fails → action: "halt_vix"
+                3. Assess current account positions, cash, and existing wheel legs.
+                4. Scan for new cash-secured put opportunities.
+                5. Evaluate risk/reward with explicit probabilities and expected values.
+                6. Decide next action: enter new put, roll, close, hold, or halt_vix.
+                
+                Prioritize capital preservation. Never trade if VIX > 30.
                 
                 Output JSON only:
                 {
-                  "action": "hold|sell_put|roll|close",
-                  "ticker": "EXAMPLE",
-                  "details": { "example_key": "value" },
-                  "rationale": "step-by-step reasoning here",
-                  "probability_success": 0.85,
-                  "expected_return": "5.2%%"
+                  "action": "hold|sell_put|roll|close|halt_vix",
+                  "ticker": "EXAMPLE or null",
+                  "details": { "example_key": "value" or {} },
+                  "rationale": "step-by-step reasoning here, including VIX value and source",
+                  "probability_success": 0.85 or null if halt,
+                  "expected_return": "5.2%% or null if halt",
+                  "vix_value": 17.44 or null,
+                  "vix_source": "CNBC delayed" or null
                 }
                 """, currentTime);
 

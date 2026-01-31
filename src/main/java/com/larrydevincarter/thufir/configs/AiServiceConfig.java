@@ -1,6 +1,7 @@
 package com.larrydevincarter.thufir.configs;
 
 import com.larrydevincarter.thufir.services.Assistant;
+import com.larrydevincarter.thufir.tools.MarketDataTools;
 import com.larrydevincarter.thufir.tools.Tools;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.memory.ChatMemory;
@@ -42,20 +43,20 @@ public class AiServiceConfig {
 
 
     @Bean
-    public Assistant chattingAssistant(ChatModel chatModelHighTemp, Tools tools) {
+    public Assistant chattingAssistant(ChatModel chatModelHighTemp, Tools tools, MarketDataTools marketDataTools) {
         return AiServices.builder(Assistant.class)
                 .chatModel(chatModelHighTemp)
                 .chatMemory(sharedChatMemory())
-                .tools(tools)
+                .tools(tools, marketDataTools)
                 .build();
     }
 
     @Bean
-    public Assistant workingAssistant(ChatModel chatModelLowTemp, Tools tools) {
+    public Assistant workingAssistant(ChatModel chatModelLowTemp, Tools tools, MarketDataTools marketDataTools) {
         return AiServices.builder(Assistant.class)
                 .chatModel(chatModelLowTemp)
                 .chatMemory(sharedChatMemory())
-                .tools(tools)
+                .tools(tools, marketDataTools)
                 .build();
     }
 }
