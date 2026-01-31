@@ -18,19 +18,27 @@ public class AiModelConfig {
     @Value("${xai.model.name}")
     private String modelName;
 
-    @Value("${xai.temperature:0.7}")
-    private Double temperature;
-
     @Value("${xai.max-tokens:4096}")
     private Integer maxTokens;
 
     @Bean
-    public ChatModel chatModel() {
+    public ChatModel chatModelHighTemp() {
         return OpenAiChatModel.builder()
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .modelName(modelName)
-                .temperature(temperature)
+                .temperature(0.7)
+                .maxTokens(maxTokens)
+                .build();
+    }
+
+    @Bean
+    public ChatModel chatModelLowTemp() {
+        return OpenAiChatModel.builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .modelName(modelName)
+                .temperature(0.4)
                 .maxTokens(maxTokens)
                 .build();
     }
