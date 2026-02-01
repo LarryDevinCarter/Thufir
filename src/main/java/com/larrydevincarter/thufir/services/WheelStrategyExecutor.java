@@ -2,7 +2,6 @@ package com.larrydevincarter.thufir.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.larrydevincarter.thufir.clients.MarketStatusClient;
-import com.larrydevincarter.thufir.clients.VolatilityClient;
 import com.larrydevincarter.thufir.models.dtos.MarketStatusDto;
 import com.larrydevincarter.thufir.models.entities.TradeDecision;
 import com.larrydevincarter.thufir.repositories.TradeDecisionRepository;
