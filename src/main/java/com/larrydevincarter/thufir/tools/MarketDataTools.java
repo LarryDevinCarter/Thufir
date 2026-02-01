@@ -1,6 +1,7 @@
 package com.larrydevincarter.thufir.tools;
 
 import dev.langchain4j.agent.tool.Tool;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -9,32 +10,49 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class MarketDataTools {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    record VixResult(double value, String asOf, String source, String rawSnippet) {
+        String toFormattedString() {
+            return String.format("Current VIX: %.2f (as of %s, %s)", value, asOf, source);
+        }
+    }
 
     @Tool("Fetch the current or most recent CBOE VIX level from reliable public sources. Returns the value and as-of date.")
     public String getCurrentVix() {
-        Optional<String> cnbc = tryCnbc();
+        Optional<VixResult> cnbc = tryCnbc();
+        Optional<VixResult> investing = tryInvestingDotCom();
+
+        if (cnbc.isPresent() && investing.isPresent()) {
+            double diff = Math.abs(cnbc.get().value - investing.get().value);
+            if (diff > 0.5) {
+                log.warn("VIX source mismatch: CNBC={} vs Investing={} (diff={})", cnbc.get().value, investing.get().value, diff);
+                return String.format("WARNING: Sources disagree | CNBC: %.2f (%s) | Investing: %.2f (%s) | Use with caution or manual check.",
+                        cnbc.get().value, cnbc.get().asOf, investing.get().value, investing.get().asOf);
+            }
+            return cnbc.get().toFormattedString();
+        }
+
         if (cnbc.isPresent()) {
-            log.info("CNBC VIX fetch successful: {}", cnbc.get());
-            return cnbc.get();
+            return cnbc.get().toFormattedString() + " (Investing failed)";
         }
-
-        Optional<String> investing = tryInvestingDotCom();
         if (investing.isPresent()) {
-            log.info("Investing.com VIX fetch successful: {}", investing.get());
-            return investing.get();
+            return investing.get().toFormattedString() + " (CNBC failed)";
         }
 
-        log.warn("All VIX sources failed — defaulting to halt or manual check.");
-        return "All sources failed";  // Or throw RuntimeException for safety in trading context
+        log.error("Both VIX sources failed completely");
+        return "VIX fetch CRITICAL FAILURE — BOTH SOURCES DOWN — HALT TRADING & ALERT LARRY";
     }
 
-    public Optional<String> tryCnbc() {
+    private Optional<VixResult> tryCnbc() {
         try {
             String url = "https://www.cnbc.com/quotes/.VIX";
             String html = restTemplate.getForObject(url, String.class);
@@ -46,23 +64,21 @@ public class MarketDataTools {
                 return Optional.empty();
             }
 
-            // Take a larger snippet to capture value and change
-            String snippet = html.substring(markerIndex, Math.min(markerIndex + 300, html.length()));  // Increased to 300 for safety
+            String snippet = html.substring(markerIndex, Math.min(markerIndex + 300, html.length()));
 
-            // Extract time: pattern like "MM/DD/YY TZ" after marker
-            java.util.regex.Matcher timeMatcher = java.util.regex.Pattern.compile("(\\d{2}/\\d{2}/\\d{2}\\s*(AM|PM)?\\s*EST)").matcher(snippet);
+            Matcher timeMatcher = Pattern.compile("(\\d{2}/\\d{2}/\\d{2}\\s*(AM|PM)?\\s*EST)").matcher(snippet);
             String timePart = timeMatcher.find() ? timeMatcher.group(1) : "last close (delayed)";
 
-            // Extract VIX value: first \d{1,2}\.\d{2} after time, ignoring tags
-            java.util.regex.Matcher valueMatcher = java.util.regex.Pattern.compile("(\\d{1,2}\\.\\d{2})").matcher(snippet.substring(timeMatcher.end()));  // Start after time
+            Matcher valueMatcher = Pattern.compile("(\\d{1,2}\\.\\d{2})").matcher(snippet.substring(timeMatcher.end()));
             if (valueMatcher.find()) {
-                String vixValue = valueMatcher.group(1);
+                String vixValueStr = valueMatcher.group(1);
+                double vixValue = Double.parseDouble(vixValueStr);
 
-                // Optional: Extract change for richer info (e.g., "+0.56 (+3.32%)")
-                java.util.regex.Matcher changeMatcher = java.util.regex.Pattern.compile("([+-]\\d{1,2}\\.\\d{2})\\s*\\(([+-]\\d{1,2}\\.\\d{2}%)\\)").matcher(snippet.substring(valueMatcher.end()));
+                Matcher changeMatcher = Pattern.compile("([+-]\\d{1,2}\\.\\d{2})\\s*\\(([+-]\\d{1,2}\\.\\d{2}%)\\)").matcher(snippet.substring(valueMatcher.end()));
                 String change = changeMatcher.find() ? changeMatcher.group(0) : "";
 
-                return Optional.of(String.format("Current VIX: %s%s (as of %s, delayed at least 15 min). Source: CNBC.", vixValue, change.isEmpty() ? "" : " " + change, timePart));
+                String formattedAsOf = timePart + (change.isEmpty() ? "" : " " + change);
+                return Optional.of(new VixResult(vixValue, formattedAsOf, "CNBC delayed", snippet));
             }
 
             log.warn("CNBC value extraction failed from snippet: {}", snippet);
@@ -73,7 +89,7 @@ public class MarketDataTools {
         }
     }
 
-    private Optional<String> tryInvestingDotCom() {
+    private Optional<VixResult> tryInvestingDotCom() {
         String url = "https://www.investing.com/indices/volatility-s-p-500";
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -82,37 +98,36 @@ public class MarketDataTools {
 
             String html = restTemplate.exchange(url, HttpMethod.GET, entity, String.class).getBody();
             String snippet = null;
-            // Target exact attribute from current HTML
             String keyMarker = "data-test=\"instrument-price-last\"";
             int idx = html.indexOf(keyMarker);
             if (idx != -1) {
                 snippet = html.substring(Math.max(0, idx - 100), Math.min(html.length(), idx + 300));
-                java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d{1,2}\\.\\d{2})").matcher(snippet);
+                Matcher m = Pattern.compile("(\\d{1,2}\\.\\d{2})").matcher(snippet);
                 while (m.find()) {
-                    String value = m.group(1);
-                    double val = Double.parseDouble(value);
-                    if (val >= 5.0 && val <= 80.0) {  // realistic VIX bounds
-                        // Check proximity to change symbol or "Closed"
+                    String valueStr = m.group(1);
+                    double val = Double.parseDouble(valueStr);
+                    if (val >= 5.0 && val <= 80.0) {
                         String context = snippet.substring(Math.max(0, m.start() - 80), Math.min(snippet.length(), m.end() + 150));
                         if (context.contains("+") || context.contains("-") || context.contains("Closed") || context.contains("Day's Range")) {
-                            return Optional.of(String.format("Current VIX: %s (closed 30/01, delayed from Investing.com). Change approx. visible nearby.", value));
+                            String asOf = context.contains("Closed") ? "closed (delayed)" : "intraday (delayed)";
+                            return Optional.of(new VixResult(val, asOf, "Investing.com", snippet));
                         }
                     }
                 }
             }
 
-            // Fallback broader search near "Closed ·" or price context
             String[] anchors = {"Closed ·", " + ", "Day's Range", "CBOE Volatility Index"};
             for (String anchor : anchors) {
                 idx = html.indexOf(anchor);
                 if (idx != -1) {
                     snippet = html.substring(Math.max(0, idx - 200), Math.min(html.length(), idx + 200));
-                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d{1,2}\\.\\d{2})").matcher(snippet);
+                    Matcher m = Pattern.compile("(\\d{1,2}\\.\\d{2})").matcher(snippet);
                     if (m.find()) {
-                        String value = m.group(1);
-                        double val = Double.parseDouble(value);
+                        String valueStr = m.group(1);
+                        double val = Double.parseDouble(valueStr);
                         if (val >= 5.0 && val <= 80.0) {
-                            return Optional.of(String.format("Current VIX: %s (delayed from Investing.com, anchored near '%s').", value, anchor));
+                            String asOf = anchor.contains("Closed") ? "closed (delayed)" : "intraday (delayed)";
+                            return Optional.of(new VixResult(val, asOf, "Investing.com anchored near '" + anchor + "'", snippet));
                         }
                     }
                 }

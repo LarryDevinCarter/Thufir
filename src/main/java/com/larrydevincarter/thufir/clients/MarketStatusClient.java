@@ -4,6 +4,7 @@ import com.larrydevincarter.thufir.models.dtos.MarketStatusDto;
 import com.larrydevincarter.thufir.models.dtos.UpdateStatusDto;
 import com.larrydevincarter.thufir.services.OptionScannerUpdateMonitor;
 import com.larrydevincarter.thufir.utils.OptionScannerClientUtils;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -15,25 +16,20 @@ import java.time.LocalTime;
 import java.util.Map;
 
 @Component
+@RequiredArgsConstructor
 public class MarketStatusClient {
 
     private static final Logger log = LoggerFactory.getLogger(MarketStatusClient.class);
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final OptionScannerUpdateMonitor updateMonitor;
 
     private final String endpointUrl = "http://localhost:8081/api/market-status";
     private final String updateStatusUrl = "http://localhost:8081/api/update-status";
 
     private static final int MAX_RETRIES = 5;
-    private static final long INITIAL_RETRY_DELAY_MS = 10000;  // 10 seconds initial
-    private static final double BACKOFF_MULTIPLIER = 2.0;     // Exponential backoff
-    private static final long POLL_INTERVAL_MS = 60_000;  // 1 minute between polls
-    private static final int MAX_POLL_ATTEMPTS = 60;
-
-    public MarketStatusClient(OptionScannerUpdateMonitor updateMonitor) {
-        this.updateMonitor = updateMonitor;
-    }
+    private static final long INITIAL_RETRY_DELAY_MS = 10000;
+    private static final double BACKOFF_MULTIPLIER = 2.0;
 
     public MarketStatusDto getStatus() {
         if (updateMonitor.isPotentiallyUpdating()) {
@@ -61,7 +57,7 @@ public class MarketStatusClient {
                 if (statusCode == HttpStatus.OK && response.getBody() != null) {
                     log.info("Successfully fetched market status from OptionScanner on attempt {} (200 OK)", attempt);
                     return response.getBody();
-                } else if (statusCode == HttpStatus.SERVICE_UNAVAILABLE) {  // 503
+                } else if (statusCode == HttpStatus.SERVICE_UNAVAILABLE) {
                     log.warn("OptionScanner returned 503 on attempt {} — retrying in {} ms", attempt, delayMs);
                 } else {
                     log.warn("Unexpected status {} from OptionScanner on attempt {} — retrying in {} ms", statusCode, attempt, delayMs);
@@ -86,7 +82,7 @@ public class MarketStatusClient {
                     log.error("Retry sleep interrupted");
                     throw new RuntimeException("Interrupted while retrying market status fetch", ie);
                 }
-                delayMs = (long) (delayMs * BACKOFF_MULTIPLIER);  // Exponential backoff
+                delayMs = (long) (delayMs * BACKOFF_MULTIPLIER);
             }
         }
 
