@@ -26,6 +26,8 @@ public class WheelStrategyExecutor {
     private final ObjectMapper objectMapper;
     private final TradeDecisionRepository decisionRepo;
 
+    private boolean isMarketOpen = false;
+
     public WheelStrategyExecutor(@Qualifier("workingAssistant") Assistant workingAssistant, MarketStatusClient marketClient, ObjectMapper objectMapper, TradeDecisionRepository decisionRepository) {
         this.workingAssistant = workingAssistant;
         this.marketClient = marketClient;
@@ -49,12 +51,12 @@ public class WheelStrategyExecutor {
         LocalTime marketClose = marketClient.parseCloseTime(status.getTodayCloseTime());
         log.info("Trading day detected — Thufir starting cycles. Close time: {}", marketClose);
 
-        while (true) {
+        while (LocalTime.now().isBefore(marketClose)) {
 
             executeSingleWheelCycle();
 
             try {
-                Thread.sleep(5 * 60 * 1000);  // 5 minutes
+                Thread.sleep(5 * 60 * 1000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.warn("Cycle loop interrupted");

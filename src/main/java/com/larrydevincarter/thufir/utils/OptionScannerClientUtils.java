@@ -51,7 +51,7 @@ public final class OptionScannerClientUtils {
     }
 
     private static UpdateStatusDto checkUpdateStatus() {
-        RestTemplate restTemplate = new RestTemplate();  // or inject if preferred
+        RestTemplate restTemplate = new RestTemplate();
         String updateStatusUrl = "http://localhost:8081/api/update-status";
 
         try {
