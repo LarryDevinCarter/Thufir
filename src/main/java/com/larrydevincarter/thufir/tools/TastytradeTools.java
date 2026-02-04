@@ -1,11 +1,16 @@
 package com.larrydevincarter.thufir.tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.larrydevincarter.thufir.clients.TastytradeClient;
 import dev.langchain4j.agent.tool.Tool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
 import java.util.List;
@@ -17,6 +22,8 @@ import java.util.Map;
 public class TastytradeTools {
 
     private final TastytradeClient tastytradeClient;
+    private final ObjectMapper objectMapper;
+    private final RestTemplate restTemplate;
 
     @Value("${tastytrade.sandbox.account-number}")
     private String accountNumber;
@@ -147,6 +154,48 @@ public class TastytradeTools {
         } catch (Exception e) {
             log.error("TastytradeTools.getPositionsSummary failed", e);
             return "ERROR: Could not fetch positions summary. Details: " + e.getMessage();
+        }
+    }
+
+    @Tool("""
+    Fetch batch quotes for multiple equity symbols from Tastytrade. Provide comma-separated symbols like 'AAPL,MSFT,GOOGL'. 
+    Returns formatted summary with last/bid/ask/volume. Note: Sandbox data is delayed.
+    """)
+    public String getBatchQuotes(String symbolsCsv) {
+        try {
+            Map<String, Object> rawQuotes = tastytradeClient.getBatchQuotes(symbolsCsv);
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> items = (List<Map<String, Object>>) rawQuotes.get("items");
+
+            if (items == null || items.isEmpty()) {
+                return "No quote data returned for symbols: " + symbolsCsv;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("Batch quotes from Tastytrade (delayed in sandbox):\n");
+
+            for (Map<String, Object> quote : items) {
+                String symbol = (String) quote.get("symbol");
+                Double lastPrice = getDouble(quote, "last");
+                Double bid = getDouble(quote, "bid");
+                Double ask = getDouble(quote, "ask");
+                Double volume = getDouble(quote, "volume");
+
+                sb.append(String.format(
+                        "%s: Last=%.2f | Bid=%.2f | Ask=%.2f | Volume=%.0f\n",
+                        symbol, lastPrice != null ? lastPrice : -1,
+                        bid != null ? bid : -1,
+                        ask != null ? ask : -1,
+                        volume != null ? volume : 0
+                ));
+            }
+
+            return sb.toString();
+        } catch (Exception e) {
+            log.error("getBatchQuotes failed for {}", symbolsCsv, e);
+            return "ERROR fetching batch quotes for " + symbolsCsv + ": " + e.getMessage() +
+                    "\nThufir should retry or message Larry if persistent.";
         }
     }
 

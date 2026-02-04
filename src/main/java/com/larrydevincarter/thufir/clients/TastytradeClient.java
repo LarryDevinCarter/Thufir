@@ -156,6 +156,30 @@ public class TastytradeClient {
         }
     }
 
+    /**
+     * Batch fetch current quotes for multiple symbols from Tastytrade.
+     * @param symbolsCsv comma-separated symbols, e.g. "AAPL,MSFT,GOOGL"
+     * @return Map of symbol → {lastPrice, bid, ask, ...}
+     */
+    public Map<String, Object> getBatchQuotes(String symbolsCsv) {
+        String url = baseUrl + "/market-data/by-type?equity=" + symbolsCsv;
+
+        HttpEntity<Void> request = new HttpEntity<>(getAuthHeaders());
+
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, request, Map.class);
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
+                log.info("Batch quotes fetched for {}", symbolsCsv);
+                return data;
+            }
+            throw new RuntimeException("Batch quotes failed: " + response.getStatusCode());
+        } catch (Exception e) {
+            log.error("Batch quotes error for {}", symbolsCsv, e);
+            throw new RuntimeException("Tastytrade batch quotes error", e);
+        }
+    }
+
     public boolean isSessionValid() {
         return sessionToken != null && System.currentTimeMillis() < tokenExpirationTimeMs;
     }

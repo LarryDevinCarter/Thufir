@@ -1,10 +1,7 @@
 package com.larrydevincarter.thufir.configs;
 
 import com.larrydevincarter.thufir.services.Assistant;
-import com.larrydevincarter.thufir.tools.CommunicationTools;
-import com.larrydevincarter.thufir.tools.MarketDataTools;
-import com.larrydevincarter.thufir.tools.TastytradeTools;
-import com.larrydevincarter.thufir.tools.Tools;
+import com.larrydevincarter.thufir.tools.*;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
@@ -45,20 +42,22 @@ public class AiServiceConfig {
 
 
     @Bean
-    public Assistant chattingAssistant(ChatModel chatModelHighTemp, Tools tools, MarketDataTools marketDataTools, CommunicationTools communicationTools, TastytradeTools tastytradeTools) {
+    public Assistant chattingAssistant(ChatModel chatModelHighTemp, Tools tools, MarketDataTools marketDataTools, CommunicationTools communicationTools,
+                                       TastytradeTools tastytradeTools, OptionScannerTools optionScannerTools) {
         return AiServices.builder(Assistant.class)
                 .chatModel(chatModelHighTemp)
                 .chatMemory(sharedChatMemory())
-                .tools(tools, marketDataTools, communicationTools, tastytradeTools)
+                .tools(tools, marketDataTools, communicationTools, tastytradeTools, optionScannerTools)
                 .build();
     }
 
     @Bean
-    public Assistant workingAssistant(ChatModel chatModelLowTemp, Tools tools, MarketDataTools marketDataTools, CommunicationTools communicationTools, TastytradeTools tastytradeTools) {
+    public Assistant workingAssistant(ChatModel chatModelLowTemp, Tools tools, MarketDataTools marketDataTools, CommunicationTools communicationTools,
+                                      TastytradeTools tastytradeTools, OptionScannerTools optionScannerTools) {
         return AiServices.builder(Assistant.class)
                 .chatModel(chatModelLowTemp)
                 .chatMemory(sharedChatMemory())
-                .tools(tools, marketDataTools, communicationTools, tastytradeTools)
+                .tools(tools, marketDataTools, communicationTools, tastytradeTools, optionScannerTools)
                 .build();
     }
 }

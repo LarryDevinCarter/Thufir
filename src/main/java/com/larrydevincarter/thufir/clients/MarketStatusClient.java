@@ -25,7 +25,6 @@ public class MarketStatusClient {
     private final OptionScannerUpdateMonitor updateMonitor;
 
     private final String endpointUrl = "http://localhost:8081/api/market-status";
-    private final String updateStatusUrl = "http://localhost:8081/api/update-status";
 
     private static final int MAX_RETRIES = 5;
     private static final long INITIAL_RETRY_DELAY_MS = 10000;
