@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -60,13 +61,14 @@ public class TastytradeTools {
     }
 
     @Tool("""
-        Fetch current open positions in the Tastytrade account.
-        Critical for:
-        - Checking diversification (5–10 underlyings target)
-        - Ensuring no single position exceeds 10% of account value (when >$50k)
-        - Seeing existing wheel legs (short puts, covered calls)
-        Returns count of underlyings + summary stats.
-        """)
+    Fetch current open positions in the Tastytrade sandbox account.
+    Critical for:
+    - Identifying over-exposed underlyings (>10% net liq exposure — exclude from new trades)
+    - Calculating committed cash for open cash-secured puts
+    - Detecting assigned shares (for covered calls or sell decisions)
+    - Seeing existing wheel legs (short puts, covered calls)
+    Returns structured summary with per-underlying exposure, committed amounts, and counts.
+    """)
     public String getPositionsSummary() {
         try {
             Map<String, Object> positionsData = tastytradeClient.getPositions();
@@ -76,34 +78,75 @@ public class TastytradeTools {
                 return "No open positions in account " + accountNumber + ".";
             }
 
-            int positionCount = items.size();
-            StringBuilder sb = new StringBuilder();
-            sb.append(String.format("Open Positions (count: %d):\n", positionCount));
-
-            for (Map<String, Object> pos : items) {
-                String symbol = (String) pos.get("symbol");
-                String underlying = (String) pos.get("underlying-symbol");
-                String instrType = (String) pos.get("instrument-type");
-                Double quantity = getDouble(pos, "quantity");
-                Double avgPrice = getDouble(pos, "average-open-price");
-                Double marketValue = getDouble(pos, "market-value");
-
-                sb.append(String.format(
-                        "  %s (%s) | Qty: %.0f | Avg: $%.2f | Mkt Val: $%.2f | Type: %s\n",
-                        underlying, symbol, quantity, avgPrice, marketValue, instrType
-                ));
+            // Fetch net liq once for exposure %
+            Map<String, Object> balances = tastytradeClient.getAccountBalances();
+            Double netLiq = getDouble(balances, "net-liquidating-value");
+            if (netLiq == null || netLiq <= 0) {
+                netLiq = 1.0;
             }
 
-            long uniqueUnderlyings = items.stream()
-                    .map(m -> (String) m.get("underlying-symbol"))
-                    .distinct().count();
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("Open Positions in account %s (total count: %d):\n\n", accountNumber, items.size()));
 
-            sb.append(String.format("\nUnique underlyings: %d (target: 5–10)\n", uniqueUnderlyings));
+            double totalCommittedCsp = 0.0;
+            Map<String, Double> underlyingExposure = new HashMap<>();
+            Map<String, Integer> underlyingCount = new HashMap<>();
+            int assignedSharesCount = 0;
+
+            for (Map<String, Object> pos : items) {
+                String underlying = (String) pos.get("underlying-symbol");
+                String symbol = (String) pos.get("symbol");
+                String instrType = (String) pos.get("instrument-type");
+                Double qty = getDouble(pos, "quantity");
+                Double avgPrice = getDouble(pos, "average-open-price");
+                Double mktValue = getDouble(pos, "market-value");
+                String side = (String) pos.get("long-short");
+
+                if (qty == null) qty = 0.0;
+                if (mktValue == null) mktValue = 0.0;
+
+                sb.append(String.format(
+                        "Underlying: %s | Symbol: %s | Type: %s | Qty: %.0f | Avg Price: $%.2f | Mkt Value: $%.2f\n",
+                        underlying, symbol, instrType, qty, avgPrice, mktValue
+                ));
+
+                double exposure = Math.abs(mktValue);
+                underlyingExposure.merge(underlying, exposure, Double::sum);
+                underlyingCount.merge(underlying, 1, Integer::sum);
+
+                if ("Equity Option".equals(instrType) && "Put".equalsIgnoreCase((String) pos.getOrDefault("option-type", ""))
+                        && qty < 0) { // short position
+                    Double strike = getDouble(pos, "strike-price");
+                    if (strike != null) {
+                        double committed = strike * 100 * Math.abs(qty);
+                        totalCommittedCsp += committed;
+                        sb.append(String.format("  → Short Put | Committed cash: $%.2f (strike %.2f)\n", committed, strike));
+                    }
+                }
+
+                if ("Stock".equals(instrType) && qty > 0) {
+                    assignedSharesCount += qty.intValue();
+                    sb.append("  → Assigned shares (covered call candidate)\n");
+                }
+            }
+
+            long uniqueUnderlyings = underlyingExposure.size();
+            sb.append("\nSummary:\n");
+            sb.append(String.format("  Unique underlyings: %d\n", uniqueUnderlyings));
+            sb.append(String.format("  Total assigned shares: %d\n", assignedSharesCount));
+            sb.append(String.format("  Total CSP committed cash: $%.2f\n", totalCommittedCsp));
+
+            sb.append("\nExposure per underlying (market value % of net liq):\n");
+            Double finalNetLiq = netLiq;
+            underlyingExposure.forEach((und, exp) -> {
+                double pct = (exp / finalNetLiq) * 100.0;
+                sb.append(String.format("  %s: $%.2f (%.2f%% of net liq)\n", und, exp, pct));
+            });
 
             return sb.toString();
         } catch (Exception e) {
             log.error("TastytradeTools.getPositionsSummary failed", e);
-            return "ERROR: Could not fetch positions. " + e.getMessage();
+            return "ERROR: Could not fetch positions summary. Details: " + e.getMessage();
         }
     }
 
