@@ -41,7 +41,7 @@ public class OptionScannerTools {
                 dto.setExcludedTickers(List.of(excludedTickersCsv.split(",")));
             }
 
-            Map<String, Object> response = client.getStockCandidates(dto);
+            List<String> response = client.getStockCandidates(dto);
             return "Stock candidates response:\n" + objectMapper.writeValueAsString(response);
         } catch (Exception e) {
             return "ERROR fetching candidates: " + e.getMessage();

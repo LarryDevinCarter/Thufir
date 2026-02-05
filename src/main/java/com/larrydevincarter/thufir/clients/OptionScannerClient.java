@@ -1,7 +1,6 @@
 
 package com.larrydevincarter.thufir.clients;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.larrydevincarter.thufir.models.dtos.OptionBatchRequestDto;
 import com.larrydevincarter.thufir.models.dtos.StockCandidatesRequestDto;
@@ -9,11 +8,8 @@ import com.larrydevincarter.thufir.services.OptionScannerUpdateMonitor;
 import com.larrydevincarter.thufir.utils.OptionScannerClientUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -41,9 +37,9 @@ public class OptionScannerClient {
      * Fetch ranked stock candidates for new cash-secured puts (GET endpoint).
      * Filters applied server-side based on params.
      *
-     * @return Raw data map from OptionScanner response
+     * @return List of ticker strings from OptionScanner response
      */
-    public Map<String, Object> getStockCandidates(StockCandidatesRequestDto requestDto) {
+    public List<String> getStockCandidates(StockCandidatesRequestDto requestDto) {
         waitForUpdateIfNeeded();
         String url = BASE_URL + "/stock-candidates";
 
@@ -53,13 +49,18 @@ public class OptionScannerClient {
         HttpEntity<StockCandidatesRequestDto> entity = new HttpEntity<>(requestDto, headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            ResponseEntity<List<String>> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    entity,
+                    new ParameterizedTypeReference<List<String>>() {}
+            );
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 return response.getBody();
             }
-            throw new RuntimeException("Unexpected response: " + response.getStatusCode());
+            throw new RuntimeException("Stock candidates failed: " + response.getStatusCode());
         } catch (Exception e) {
-            log.error("Failed to fetch stock candidates", e);
+            log.error("Stock candidates error", e);
             throw new RuntimeException("Stock candidates error: " + e.getMessage(), e);
         }
     }
