@@ -68,7 +68,7 @@ public class TastytradeTools {
     }
 
     @Tool("""
-    Fetch current open positions in the Tastytrade sandbox account.
+    Fetch current open positions in the Tastytrade account.
     Critical for:
     - Identifying over-exposed underlyings (>10% net liq exposure — exclude from new trades)
     - Calculating committed cash for open cash-secured puts
@@ -159,7 +159,7 @@ public class TastytradeTools {
 
     @Tool("""
     Fetch batch quotes for multiple equity symbols from Tastytrade. Provide comma-separated symbols like 'AAPL,MSFT,GOOGL'. 
-    Returns formatted summary with last/bid/ask/volume. Note: Sandbox data is delayed.
+    Returns formatted summary with last/bid/ask/volume.
     """)
     public String getBatchQuotes(String symbolsCsv) {
         try {
@@ -173,7 +173,7 @@ public class TastytradeTools {
             }
 
             StringBuilder sb = new StringBuilder();
-            sb.append("Batch quotes from Tastytrade (delayed in sandbox):\n");
+            sb.append("Batch quotes from Tastytrade :\n");
 
             for (Map<String, Object> quote : items) {
                 String symbol = (String) quote.get("symbol");

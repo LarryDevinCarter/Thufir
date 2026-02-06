@@ -23,7 +23,7 @@ public class OptionScannerTools {
 
     @Tool("""
     Fetch ranked, filtered stock candidates for new cash-secured puts.
-    Thufir passes a structured request with hold streak, max count, liquidity, and excluded tickers.
+    Thufir passes a structured request with hold streak, liquidity, and excluded tickers.
     Returns top-ranked tickers + metrics.
     """)
     public String getStockCandidatesForPuts(
@@ -35,7 +35,6 @@ public class OptionScannerTools {
         try {
             StockCandidatesRequestDto dto = new StockCandidatesRequestDto();
             dto.setHoldStreak(holdStreak);
-            dto.setLimit(maxCandidates);
             dto.setRemainingLiquidity(remainingLiquidity);
             if (excludedTickersCsv != null && !excludedTickersCsv.isBlank()) {
                 dto.setExcludedTickers(List.of(excludedTickersCsv.split(",")));
