@@ -18,7 +18,7 @@ public class TastytradeClient {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${tastytrade.sandbox.base-url}")
+    @Value("${tastytrade.live.base-url}")
     private String baseUrl;
 
     @Value("${tastytrade.sandbox.username}")
@@ -27,7 +27,7 @@ public class TastytradeClient {
     @Value("${tastytrade.sandbox.password}")
     private String password;
 
-    @Value("${tastytrade.sandbox.account-number}")
+    @Value("${tastytrade.live.account-number}")
     private String accountNumber;
 
     private String sessionToken;
