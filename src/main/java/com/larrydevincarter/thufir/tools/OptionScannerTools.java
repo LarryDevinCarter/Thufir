@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.larrydevincarter.thufir.clients.OptionScannerClient;
 import com.larrydevincarter.thufir.models.dtos.OptionBatchRequestDto;
+import com.larrydevincarter.thufir.models.dtos.OptionBatchResponseDto;
 import com.larrydevincarter.thufir.models.dtos.StockCandidatesRequestDto;
 import dev.langchain4j.agent.tool.Tool;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,6 @@ public class OptionScannerTools {
     """)
     public String getStockCandidatesForPuts(
             int holdStreak,
-            int maxCandidates,
             double remainingLiquidity,
             String excludedTickersCsv
     ) {
@@ -55,7 +55,7 @@ public class OptionScannerTools {
     public String getBatchOptionChains(String tickerPriceDtosJson) {
         try {
             List<OptionBatchRequestDto> dtos = objectMapper.readValue(tickerPriceDtosJson, new TypeReference<>() {});
-            Map<String, Object> response = client.getBatchOptionChains(dtos);
+            OptionBatchResponseDto response = client.getBatchOptionChains(dtos);
             return "Batch option chains:\n" + objectMapper.writeValueAsString(response);
         } catch (Exception e) {
             return "ERROR batch chains: " + e.getMessage();

@@ -3,6 +3,7 @@ package com.larrydevincarter.thufir.clients;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.larrydevincarter.thufir.models.dtos.OptionBatchRequestDto;
+import com.larrydevincarter.thufir.models.dtos.OptionBatchResponseDto;
 import com.larrydevincarter.thufir.models.dtos.StockCandidatesRequestDto;
 import com.larrydevincarter.thufir.services.OptionScannerUpdateMonitor;
 import com.larrydevincarter.thufir.utils.OptionScannerClientUtils;
@@ -71,7 +72,7 @@ public class OptionScannerClient {
      *
      * @return Raw data map from OptionScanner response
      */
-    public Map<String, Object> getBatchOptionChains(List<OptionBatchRequestDto> dtos) {
+    public OptionBatchResponseDto getBatchOptionChains(List<OptionBatchRequestDto> dtos) {
         waitForUpdateIfNeeded();
         String url = BASE_URL + "/option-chains/batch";
 
@@ -81,7 +82,7 @@ public class OptionScannerClient {
         HttpEntity<List<OptionBatchRequestDto>> entity = new HttpEntity<>(dtos, headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
+            ResponseEntity<OptionBatchResponseDto> response = restTemplate.exchange(url, HttpMethod.POST, entity, OptionBatchResponseDto.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 return response.getBody();
             }
