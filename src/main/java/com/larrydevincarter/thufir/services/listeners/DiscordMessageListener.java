@@ -1,5 +1,6 @@
-package com.larrydevincarter.thufir.services;
+package com.larrydevincarter.thufir.services.listeners;
 
+import com.larrydevincarter.thufir.services.Assistant;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
@@ -26,7 +27,7 @@ public class DiscordMessageListener extends ListenerAdapter {
     private String commandPrefix;
 
     public DiscordMessageListener(@Qualifier("chattingAssistant") Assistant chattingAssistant,
-            @Qualifier("workingAssistant") Assistant workingAssistant) {
+                                  @Qualifier("workingAssistant") Assistant workingAssistant) {
         this.chattingAssistant = chattingAssistant;
         this.workingAssistant = workingAssistant;
     }

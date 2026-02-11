@@ -1,6 +1,6 @@
 package com.larrydevincarter.thufir.configs;
 
-import com.larrydevincarter.thufir.services.DiscordMessageListener;
+import com.larrydevincarter.thufir.services.listeners.DiscordMessageListener;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import net.dv8tion.jda.api.JDA;
@@ -34,7 +34,7 @@ public class DiscordBotConfig {
                 .setMemberCachePolicy(MemberCachePolicy.NONE)
                 .setChunkingFilter(ChunkingFilter.NONE)
                 .addEventListeners(messageListener)
-                .setActivity(Activity.watching("Wheel cycles"))
+                .setActivity(Activity.watching("Watching the market"))
                 .build();
 
         jda.awaitReady();
