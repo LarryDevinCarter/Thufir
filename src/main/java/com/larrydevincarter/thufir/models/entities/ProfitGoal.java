@@ -32,6 +32,12 @@ public class ProfitGoal {
     @Column
     private LocalDateTime profitTakenAt;
 
+    @Column(nullable = false)
+    private boolean fundsTransferred = false;
+
+    @Column
+    private LocalDateTime fundsTransferredAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

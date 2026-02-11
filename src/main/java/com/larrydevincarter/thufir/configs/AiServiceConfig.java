@@ -17,6 +17,7 @@ import java.io.IOException;
 @Configuration
 public class AiServiceConfig {
 
+
     @Bean
     public ChatMemory sharedChatMemory() {
 

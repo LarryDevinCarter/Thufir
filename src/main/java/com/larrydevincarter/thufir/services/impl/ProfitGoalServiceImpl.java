@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -17,7 +18,7 @@ public class ProfitGoalServiceImpl implements ProfitGoalService {
     private final ProfitGoalRepository repo;
 
     public Optional<ProfitGoal> getCurrent() {
-        return repo.findTopByOrderByUpdatedAtDesc();
+        return repo.findTopByProfitTakenFalseOrderByCreatedAtDesc();
     }
 
     public ProfitGoal setNewProfitGoal(BigDecimal newAmount) {
@@ -61,5 +62,20 @@ public class ProfitGoalServiceImpl implements ProfitGoalService {
 
     public Optional<BigDecimal> getCurrentAmount() {
         return getCurrent().map(ProfitGoal::getAmount);
+    }
+
+    public List<ProfitGoal> getPendingTransfers() {
+        return repo.findByProfitTakenTrueAndFundsTransferredFalseOrderByProfitTakenAtDesc();
+    }
+
+    public ProfitGoal markFundsTransferred() {
+        return getPendingTransfers().stream()
+                .findFirst()
+                .map(goal -> {
+                    goal.setFundsTransferred(true);
+                    goal.setFundsTransferredAt(LocalDateTime.now());
+                    return repo.save(goal);
+                })
+                .orElseThrow(() -> new IllegalStateException("No pending profit transfers found"));
     }
 }

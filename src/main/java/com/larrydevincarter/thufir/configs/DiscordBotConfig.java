@@ -1,6 +1,6 @@
 package com.larrydevincarter.thufir.configs;
 
-import com.larrydevincarter.thufir.services.listeners.DiscordMessageListener;
+import com.larrydevincarter.thufir.listeners.DiscordMessageListener;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import net.dv8tion.jda.api.JDA;

@@ -1,5 +1,6 @@
-package com.larrydevincarter.thufir.services.listeners;
+package com.larrydevincarter.thufir.listeners;
 
+import com.larrydevincarter.thufir.configs.AiServiceConfig;
 import com.larrydevincarter.thufir.services.Assistant;
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;

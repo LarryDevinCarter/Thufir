@@ -1,5 +1,6 @@
 package com.larrydevincarter.thufir.tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.larrydevincarter.thufir.models.entities.ProfitGoal;
 import com.larrydevincarter.thufir.services.ProfitGoalService;
 import dev.langchain4j.agent.tool.Tool;
@@ -7,12 +8,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
 public class ProfitGoalTools {
 
     private final ProfitGoalService service;
+    private final ObjectMapper objectMapper;
 
     @Tool("""
         Returns the current active profit goal P in USD (plain number, no $ sign).
@@ -55,5 +59,39 @@ public class ProfitGoalTools {
     @Tool("Check whether profit-taking is currently allowed (returns true/false)")
     public boolean isProfitTakingAllowed() {
         return service.isProfitTakingAllowed();
+    }
+
+    @Tool("""
+        Get list of profit goals that are taken but not yet transferred.
+        Returns JSON array of objects with id, amount, takenAt.
+        """)
+    public String getPendingTransferGoals() {
+        try {
+            List<ProfitGoal> pending = service.getPendingTransfers();
+            List<Map<String, Object>> data = pending.stream()
+                    .map(g -> Map.<String, Object>of(
+                            "id", g.getId(),
+                            "amount", g.getAmount().toPlainString(),
+                            "takenAt", g.getProfitTakenAt() != null ? g.getProfitTakenAt().toString() : "N/A"
+                    ))
+                    .toList();
+            return objectMapper.writeValueAsString(data);
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    @Tool("""
+        Mark the latest pending profit goal as funds transferred.
+        Call ONLY when Larry confirms via Discord that the transfer is complete.
+        """)
+    public String markFundsTransferred() {
+        try {
+            ProfitGoal updated = service.markFundsTransferred();
+            return "Funds marked as transferred for goal ID " + updated.getId() +
+                    " ($" + updated.getAmount().toPlainString() + ").";
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
     }
 }
