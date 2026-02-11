@@ -74,7 +74,7 @@ public class DiscordMessageListener extends ListenerAdapter {
             Review immediately:
             - If command/override → acknowledge & adjust behavior
             - If clarification needed → ask via sendMessageToLarry
-            - Send confirmation back to Discord if useful
+            - Send confirmation back to Discord
         """.formatted(messageBlock, LocalDateTime.now(ZoneId.of("America/Chicago")));
 
         String assistantResponse = workingAssistant.chat(prompt);
@@ -98,7 +98,7 @@ public class DiscordMessageListener extends ListenerAdapter {
             Review immediately:
             - If command/override → acknowledge & adjust behavior
             - If clarification needed → ask via sendMessageToLarry
-            - Send confirmation back to Discord if useful
+            - Send confirmation back to Discord
         """.formatted(messageBlock, LocalDateTime.now(ZoneId.of("America/Chicago")));
 
         String assistantResponse = chattingAssistant.chat(prompt);

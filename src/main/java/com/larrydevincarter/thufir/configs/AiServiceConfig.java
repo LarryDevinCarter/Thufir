@@ -42,22 +42,20 @@ public class AiServiceConfig {
 
 
     @Bean
-    public Assistant chattingAssistant(ChatModel chatModelHighTemp, Tools tools, MarketDataTools marketDataTools, CommunicationTools communicationTools,
-                                       TastytradeTools tastytradeTools, OptionScannerTools optionScannerTools) {
+    public Assistant chattingAssistant(ChatModel chatModelHighTemp, Tools tools, CommunicationTools communicationTools) {
         return AiServices.builder(Assistant.class)
                 .chatModel(chatModelHighTemp)
                 .chatMemory(sharedChatMemory())
-                .tools(tools, marketDataTools, communicationTools, tastytradeTools, optionScannerTools)
+                .tools(tools, communicationTools)
                 .build();
     }
 
     @Bean
-    public Assistant workingAssistant(ChatModel chatModelLowTemp, Tools tools, MarketDataTools marketDataTools, CommunicationTools communicationTools,
-                                      TastytradeTools tastytradeTools, OptionScannerTools optionScannerTools) {
+    public Assistant workingAssistant(ChatModel chatModelLowTemp, Tools tools, CommunicationTools communicationTools) {
         return AiServices.builder(Assistant.class)
                 .chatModel(chatModelLowTemp)
                 .chatMemory(sharedChatMemory())
-                .tools(tools, marketDataTools, communicationTools, tastytradeTools, optionScannerTools)
+                .tools(tools, communicationTools)
                 .build();
     }
 }

@@ -23,28 +23,22 @@ public class CommunicationTools {
     private String discordWebhookUrl;
 
     @Tool("""
-        Send a message to Larry (the builder/owner).
+            Send a message to Larry via the Discord channel.
+
+            Use this whenever you want to:
+            • Give a status update, portfolio snapshot, or cycle summary
+            • Share a buy / sell recommendation with reasoning
+            • Report a price fetch issue, calculation question, or edge case
+            • Ask for confirmation, clarification, or override approval
+            • Deliver any important alert (price spike, profit trigger, etc.)
+
+            Params:
+            • content  → the main message text (keep readable on phone: short lines, bullets, bold **tickers**, `numbers`)
+            • urgent   → true ONLY for time-sensitive situations (profit trigger hit, major data failure, high-conviction setup needing quick yes/no). False for routine logs/updates.
+            • context  → short label (examples: PORTFOLIO, BUY_NVDA, SELL_TSLA, PROFIT_TRIGGER, DATA_ISSUE, QUESTION)
         
-        Use this tool whenever you want to:
-        - Log observations, status updates, or cycle summaries for the record
-        - Share non-time-sensitive insights or market notes
-        - Report minor issues or anomalies worth noting
-        - Request clarification, approval, or input on edge cases
-        - Raise time-sensitive or critical alerts that need immediate attention
-        
-        Parameters:
-        - content: the message text (keep concise, include relevant numbers/context)
-        - urgent: set to true ONLY when the situation is time-sensitive or high-importance 
-          and delayed response could affect trading decisions, capital preservation, 
-          or system reliability. Examples: complete VIX fetch failure, major source mismatch, 
-          unexpected halt triggered, high-conviction trade setup needing confirmation, 
-          potential risk threshold breach.
-          For routine logs, status reports, or low-priority notes → keep urgent=false (no ping).
-        - context: short category label to help triage quickly 
-          (examples: "CYCLE_STATUS", "VIX_HEALTH", "TRADE_OBSERVATION", "CLARIFICATION_NEEDED", "ALERT")
-        
-        All messages (urgent or not) are stored persistently and appear in the Discord channel.
-        Only urgent=true triggers a notification/ping.
+            All messages are logged in Discord.
+            urgent=true adds @everyone ping + 🚨 emoji prefix.
         """)
     public String sendMessageToLarry(String content, boolean urgent, String context) {
         String messageBlock = String.format(

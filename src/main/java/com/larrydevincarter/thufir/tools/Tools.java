@@ -12,6 +12,4 @@ public class Tools {
     public String currentDateTime() {
         return LocalDateTime.now().toString();
     }
-
-    // Add more income-focused tools here later (e.g., stock data fetch, content ideas, etc.)
 }
