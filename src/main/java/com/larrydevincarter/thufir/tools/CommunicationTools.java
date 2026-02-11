@@ -7,9 +7,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -23,38 +23,41 @@ public class CommunicationTools {
     private String discordWebhookUrl;
 
     @Tool("""
-            Send a message to Larry via the Discord channel.
-
-            Use this whenever you want to:
-            • Give a status update, portfolio snapshot, or cycle summary
-            • Share a buy / sell recommendation with reasoning
-            • Report a price fetch issue, calculation question, or edge case
-            • Ask for confirmation, clarification, or override approval
-            • Deliver any important alert (price spike, profit trigger, etc.)
-
-            Params:
-            • content  → the main message text (keep readable on phone: short lines, bullets, bold **tickers**, `numbers`)
-            • urgent   → true ONLY for time-sensitive situations (profit trigger hit, major data failure, high-conviction setup needing quick yes/no). False for routine logs/updates.
-            • context  → short label (examples: PORTFOLIO, BUY_NVDA, SELL_TSLA, PROFIT_TRIGGER, DATA_ISSUE, QUESTION)
-        
-            All messages are logged in Discord.
-            urgent=true adds @everyone ping + 🚨 emoji prefix.
-        """)
+                Send a message to Larry via the Discord channel.
+                Automatically splits long messages (>1900 chars) into numbered parts to stay safely under Discord's 2000-char limit.
+                Use this for all status updates, recommendations, alerts, etc.
+                Params:
+                • content  → the main message text (short lines, bullets, **bold**, `code` encouraged)
+                • urgent   → true only for time-sensitive (profit trigger, major issue)
+                • context  → short label (BUY_NVDA, PROFIT_TRIGGER, PORTFOLIO_UPDATE, etc.)
+            """)
     public String sendMessageToLarry(String content, boolean urgent, String context) {
-        String messageBlock = String.format(
-                "Time: %s CST\nContent: %s\nContext: D%s\nUrgent: %b\n\n",
-                LocalDateTime.now(ZoneId.of("America/Chicago")), content, context, urgent
-        );
+        final int MAX_SAFE_LENGTH = 1900;
 
-        if (!discordWebhookUrl.isBlank()) {
-            sendDiscordWebhook(content, urgent, context);
+        String[] parts = splitMessage(content, MAX_SAFE_LENGTH);
+        String finalContent = "";
+
+        for (int i = 0; i < parts.length; i++) {
+            String part = parts[i];
+            if (parts.length > 1) {
+                part = String.format("(%d/%d) %s", i + 1, parts.length, part);
+            }
+
+            finalContent = part;
+
+            if (urgent) {
+                finalContent = "🚨 URGENT [" + context + "]: " + finalContent;
+            } else {
+                finalContent = "ℹ️ [" + context + "]: " + finalContent;
+            }
+            sendDiscordWebhook(finalContent, urgent);
         }
 
-        log.info("Message sent to Larry: {} (urgent={}, context={})", content, urgent, context);
-        return "Message delivered to Larry";
+        log.info("Sent message to Larry ({} parts, urgent={}, context={})", parts.length, urgent, context);
+        return "Message delivered to Larry (" + parts.length + " part" + (parts.length > 1 ? "s" : "") + ")";
     }
 
-    private void sendDiscordWebhook(String message, boolean urgent, String context) {
+    private void sendDiscordWebhook(String message, boolean urgent) {
         try {
             Map<String, Object> body = new HashMap<>();
 
@@ -62,12 +65,6 @@ public class CommunicationTools {
 
             if (urgent) {
                 finalContent = "@everyone " + message;
-            }
-
-            if (urgent) {
-                finalContent = "🚨 URGENT [" + context + "]: " + finalContent;
-            } else {
-                finalContent = "ℹ️ [" + context + "]: " + finalContent;
             }
 
             body.put("content", finalContent);
@@ -81,4 +78,31 @@ public class CommunicationTools {
             log.error("Discord webhook delivery failed: {}", e.getMessage());
         }
     }
+
+        private String[] splitMessage(String content, int maxLength) {
+            if (content.length() <= maxLength) {
+                return new String[]{content};
+            }
+
+            List<String> chunks = new ArrayList<>();
+            int start = 0;
+
+            while (start < content.length()) {
+                int end = Math.min(start + maxLength, content.length());
+
+                if (end < content.length()) {
+                    int lastNewline = content.lastIndexOf('\n', end);
+                    int lastSpace = content.lastIndexOf(' ', end);
+                    int splitPoint = Math.max(lastNewline, lastSpace);
+                    if (splitPoint > start) {
+                        end = splitPoint + 1;
+                    }
+                }
+
+                chunks.add(content.substring(start, end).trim());
+                start = end;
+            }
+
+            return chunks.toArray(new String[0]);
+        }
 }

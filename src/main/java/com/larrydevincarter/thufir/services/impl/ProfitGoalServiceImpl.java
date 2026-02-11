@@ -25,11 +25,21 @@ public class ProfitGoalServiceImpl implements ProfitGoalService {
             throw new IllegalArgumentException("Profit goal must be positive");
         }
 
-        // Optional: archive old one or just keep history (for now we overwrite by creating new)
+        Optional<ProfitGoal> currentOpt = getCurrent();
+
+        if (currentOpt.isPresent()) {
+            ProfitGoal current = currentOpt.get();
+            if (!current.isProfitTaken()) {
+                current.setAmount(newAmount);
+                current.setProfitTaken(false);
+                current.setUpdatedAt(LocalDateTime.now());
+                current.setProfitTakenAt(null);
+                return repo.save(current);
+            }
+        }
         ProfitGoal goal = new ProfitGoal();
         goal.setAmount(newAmount);
-        goal.setProfitTaken(false);           // reset flag on new P
-
+        goal.setProfitTaken(false);
         return repo.save(goal);
     }
 
