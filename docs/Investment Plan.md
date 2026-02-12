@@ -2,9 +2,9 @@
 
 ## Overview
 This is a disciplined, long-term buy-and-hold strategy with 10 prioritized asset categories.  
-The goal is to fund each category until its cost basis reaches a target where **doubling in price** would allow you to sell a portion realizing your profit goal (P) while leaving the original investment value (cost basis) intact in that category.
+The goal is to fund each category until its market value reaches a target where **doubling in price** would allow you to sell a portion realizing your profit goal (P) while leaving the original investment value (cost basis) intact in that category.
 
-New funds are always invested into the **earliest category in the priority list** that is still below its target cost basis.  
+New funds are always invested into the **earliest category in the priority list** that is still below its target market value.  
 Once all 10 categories reach their targets, investing stops completely.
 
 ## Profit Goal
@@ -23,18 +23,18 @@ Once all 10 categories reach their targets, investing stops completely.
 9. Other stocks (one combined basket category)  
    - ABEV, AIT, ALKS, ASR, BKR, CHRD, CRUS, CTRA, DECK, EOG, GIB, HLI, HMY, IDCC, INTU, LULU, MATX, MNSO, NTES, OVV, RDY, RMD, TSM, TW, UTHR
 
-## Target Cost Basis per Category
-| Category       | Target Cost Basis | Notes                                      |
-|----------------|-------------------|--------------------------------------------|
-| 1–3, 5–8       | P                 | Standard target                            |
-| TSLA           | 2P                | Double allocation                          |
-| GOOGL/GOOG     | P                 | Combined across both tickers               |
-| Other stocks   | P                 | Combined across all stocks in the basket   |
+## Target Market Value per Category
+| Category       | Target Market Value | Notes                                      |
+|----------------|---------------------|--------------------------------------------|
+| 1–3, 5–8       | P                   | Standard target                            |
+| TSLA           | 2P                  | Double allocation                          |
+| GOOGL/GOOG     | P                   | Combined across both tickers               |
+| Other stocks   | P                   | Combined across all stocks in the basket   |
 
 ## Investment Sequence Rule
 1. When new capital is available, start at the top of the list (NVDA).  
-2. Invest into the **first category** whose current cost basis is < target.  
-3. Add funds until that category reaches (or would exceed) its target — never buy more than needed to hit the target.  
+2. Invest into the **first category** whose current market value is < target.  
+3. Add funds until that category reaches (or exceeds) its target — never buy more than needed to hit the target.  
 4. Move to the next underfunded category in order.  
 5. Repeat until **all 10 categories** are at or above target → stop investing.
 
@@ -56,12 +56,12 @@ Once all 10 categories reach their targets, investing stops completely.
 - Example: $700 available, asset = $2,900 → buy **0.2** ($580), remainder unspent if that's all that's needed.
 
 ### TSLA (Double Allocation)
-- Target cost basis = **2P**  
+- Target market value = **2P**  
 - Buy whole shares until total invested in TSLA reaches 2P.  
 - Treated as one position for buying/selling decisions.
 
 ### GOOGL / GOOG (Combined Category)
-- Target = **P** (combined cost basis of GOOGL + GOOG)  
+- Target = **P** (combined value of GOOGL + GOOG)  
 - **Buying preference**: Always favor the cheaper ticker to keep values somewhat balanced.  
   - Let A = cheaper ticker price, B = more expensive ticker price  
   - If value owned in cheaper < (value owned in more expensive + 1 share of more expensive), buy 1 share of cheaper.  
@@ -69,7 +69,7 @@ Once all 10 categories reach their targets, investing stops completely.
 - Example: GOOGL $200, GOOG $220 → buy GOOGL until its value > (GOOG value + $220), then buy GOOG, repeat.
 
 ### Other Stocks Basket
-- Target = **P** (combined cost basis across all listed stocks)  
+- Target = **P** (combined market value across all listed stocks)  
 - Rank stocks by current share price (ascending).  
 - Apply similar balancing logic as GOOGL/GOOG: prefer adding to lower-priced / under-weighted positions in the basket.  
 - Buy whole shares only.

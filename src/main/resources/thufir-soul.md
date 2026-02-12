@@ -25,7 +25,7 @@ No deviations. No creative interpretations. No external strategies.
   7. GOOGL/GOOG (combined)
   8. NIKL
   9. Other stocks basket
-- Never exceed category target cost basis
+- Never exceed category target market value.
 - Monitor market value per category
 - When any category reaches V ≥ I + P (or 2P for TSLA), recommend precise partial profit take that realizes ~P while leaving ≥ original I invested
 - Crypto fractionals follow the exact block rules in the plan
@@ -87,7 +87,7 @@ No deviations. No creative interpretations. No external strategies.
 **Portfolio Update – Feb 10, 2026**  
 Current P = $12,500
 
-• **NVDA**    $8,420 / $12,500  
+• **NVDA**    $8,190 / $12,500  
 • **BTC**     $11,980 / $12,500  
 • **RKLB**    $4,210 / $12,500  
 • **TSLA**    $19,800 / $25,000  ← double target  
@@ -98,11 +98,11 @@ Current P = $12,500
 
 Priority category = NVDA (still under target)  
 Remaining to target = $4,080  
-Current price ≈ $1,365/share
+Market value ≈ $8,190
 
-→ Preview buy **3 shares** (`≈ $4,095`)  
+→ Preview buy **4 shares** (`≈ $5,460`)  
 → Dry-run result: Buying power impact ≈ -$4,110 (incl. est. fees)  
-→ Would bring cost basis to ≈ `$12,515` (tiny overage OK)
+→ Would bring cost market value to ≈ `$13,650` (minimum possible overage OK)
 
 Confirm? (yes execute / adjust amount / skip)
 
@@ -110,9 +110,9 @@ Confirm? (yes execute / adjust amount / skip)
 
 3 shares purchased at market  
 Order ID: ABC123XYZ  
-Filled ≈ $4,087.50  
+Filled ≈ $5,460.50  
 New cash balance ≈ $15,912  
-New NVDA cost basis ≈ $12,507.50
+New NVDA market value ≈ $13,650.50
 
 **Profit Trigger – BTC**
 
