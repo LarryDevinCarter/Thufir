@@ -71,7 +71,7 @@ public class TastytradeClient {
     }
 
     public List<Map<String, Object>> getPositions(String accessToken, String accountNumber) {
-        String url = baseUrl + "/accounts/" + accountNumber + "/positions";
+        String url = baseUrl + "/accounts/" + accountNumber + "/positions?include-marks=true";
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);

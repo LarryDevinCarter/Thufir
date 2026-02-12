@@ -107,11 +107,29 @@ public class TastytradeServiceImpl implements TastytradeService {
         try {
             Position pos = new Position();
             pos.setSymbol((String) raw.get("symbol"));
-            pos.setQuantity(parseBigDecimal(raw.get("quantity")));
-            pos.setAveragePrice(parseBigDecimal(raw.get("average-open-price")));
-            //TODO: Needs updated with second pull
-            pos.setMarketValue(BigDecimal.ZERO);
-            pos.setUnrealizedPnl(BigDecimal.ZERO);
+            BigDecimal quantity = parseBigDecimal(raw.get("quantity"));
+            pos.setQuantity(quantity);
+
+            BigDecimal avgOpenPrice = parseBigDecimal(raw.get("average-open-price"));
+            pos.setAveragePrice(avgOpenPrice);
+
+            BigDecimal markPrice = parseBigDecimal(raw.get("mark-price"));
+            if (markPrice == null) {
+                throw new IllegalStateException("Mark price missing; ensure include-marks=true is used.");
+            }
+
+            Integer multiplier = (Integer) raw.get("multiplier");
+            if (multiplier == null) {
+                multiplier = 1;
+            }
+            BigDecimal mult = new BigDecimal(multiplier);
+
+            BigDecimal marketValue = quantity.multiply(markPrice).multiply(mult);
+            pos.setMarketValue(marketValue);
+
+            BigDecimal pnl = markPrice.subtract(avgOpenPrice).multiply(quantity).multiply(mult);
+            pos.setUnrealizedPnl(pnl);
+
             return pos;
         } catch (Exception e) {
             log.warn("Failed to map position: {}", raw, e);
