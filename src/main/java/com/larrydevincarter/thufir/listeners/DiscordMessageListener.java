@@ -79,6 +79,9 @@ public class DiscordMessageListener extends ListenerAdapter {
             - Send confirmation back to Discord
         """.formatted(messageBlock, LocalDateTime.now(ZoneId.of("America/Chicago")));
 
+//        log.info("RAW PROMPT BEING SENT TO ASSISTANT (length {}):\n{}", prompt.length(), prompt);
+//        log.info("Chat memory size before call: {}", AiServiceConfig.sharedMemory.messages().size());
+//        log.info("This is the full ai memory log: {}", AiServiceConfig.sharedMemory.messages());
         String assistantResponse = workingAssistant.chat(prompt);
 
         log.info("Immediate Discord reply processed. Assistant response: {}", assistantResponse);
@@ -103,6 +106,9 @@ public class DiscordMessageListener extends ListenerAdapter {
             - Send confirmation back to Discord
         """.formatted(messageBlock, LocalDateTime.now(ZoneId.of("America/Chicago")));
 
+//        log.info("RAW PROMPT BEING SENT TO ASSISTANT (length {}):\n{}", prompt.length(), prompt);
+//        log.info("Chat memory size before call: {}", AiServiceConfig.sharedMemory.messages().size());
+//        log.info("This is the full ai memory log: {}", AiServiceConfig.sharedMemory.messages());
         String assistantResponse = chattingAssistant.chat(prompt);
 
         log.info("Immediate Discord reply processed. Assistant response: {}", assistantResponse);

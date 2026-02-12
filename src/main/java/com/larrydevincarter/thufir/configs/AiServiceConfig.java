@@ -1,5 +1,6 @@
 package com.larrydevincarter.thufir.configs;
 
+import com.larrydevincarter.thufir.memory.SafeMessageWindowChatMemory;
 import com.larrydevincarter.thufir.services.Assistant;
 import com.larrydevincarter.thufir.tools.*;
 import dev.langchain4j.data.message.SystemMessage;
@@ -9,16 +10,18 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Scope;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.util.StreamUtils;
+
 import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 
 @Configuration
 public class AiServiceConfig {
 
-
     @Bean
+    @Scope("singleton")
     public ChatMemory sharedChatMemory() {
 
         String soul;
@@ -30,16 +33,14 @@ public class AiServiceConfig {
 
         } catch (IOException e) {
 
-            throw new RuntimeException("Failed to load Thufir's soul from thufir-soul.md. " +
-                    "Ensure the file exists in src/main/resources/. Error: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to load thufir-soul.md", e);
 
         }
 
-        MessageWindowChatMemory memory = MessageWindowChatMemory.withMaxMessages(50);
-        memory.add(SystemMessage.from(soul));
-        return memory;
+        SafeMessageWindowChatMemory safeMemory = new SafeMessageWindowChatMemory(50);
+        safeMemory.add(SystemMessage.from(soul));
+        return safeMemory;
     }
-
 
 
     @Bean

@@ -1,6 +1,10 @@
 package com.larrydevincarter.thufir.services;
 
+import com.larrydevincarter.thufir.models.dtos.OrderRequestDto;
+import com.larrydevincarter.thufir.models.entities.Position;
+
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 public interface TastytradeService {
@@ -12,4 +16,10 @@ public interface TastytradeService {
     Map<String, Object> getCurrentBalances();
 
     BigDecimal getAvailableCash();
+
+    List<Position> fetchAndSavePositions();
+
+    Map<String, Object> placeOrderDryRun(OrderRequestDto request);
+
+    Map<String, Object> placeOrder(OrderRequestDto request);
 }

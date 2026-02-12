@@ -19,7 +19,7 @@ public class TastytradeClient {
 
     private final RestTemplate restTemplate;
 
-    @Value("${tastytrade.api.base-url:https://api.tastyworks.com}")
+    @Value("${tastytrade.live.base-url}")
     private String baseUrl;
 
     public Map<String, Object> refreshToken(String clientId, String clientSecret, String refreshToken) {
@@ -68,5 +68,53 @@ public class TastytradeClient {
         }
         log.error("Failed to fetch balances for account {}: status={}", accountNumber, response.getStatusCode());
         throw new RuntimeException("Failed to fetch tastytrade balances for account " + accountNumber);
+    }
+
+    public List<Map<String, Object>> getPositions(String accessToken, String accountNumber) {
+        String url = baseUrl + "/accounts/" + accountNumber + "/positions";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = response.getBody();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> dataMap = (Map<String, Object>) body.get("data");
+            if (dataMap != null) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> items = (List<Map<String, Object>>) dataMap.get("items");
+                if (items != null) {
+                    return items;
+                }
+            }
+        }
+        log.error("Failed to fetch positions for account {}: status={}", accountNumber, response.getStatusCode());
+        throw new RuntimeException("Failed to fetch tastytrade positions for account " + accountNumber);
+    }
+
+    public Map<String, Object> submitOrder(String accessToken, String accountNumber, Map<String, Object> orderBody, boolean dryRun) {
+        String endpoint = dryRun ? "/orders/dry-run" : "/orders";
+        String url = baseUrl + "/accounts/" + accountNumber + endpoint;
+        log.info(url);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(orderBody, headers);
+
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
+
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            return response.getBody();
+        } else {
+            log.error("Order submission failed (dryRun={}): status={}, body={}", dryRun, response.getStatusCode(), response.getBody());
+            throw new RuntimeException("Order submission failed: " + response.getStatusCode());
+        }
     }
 }
