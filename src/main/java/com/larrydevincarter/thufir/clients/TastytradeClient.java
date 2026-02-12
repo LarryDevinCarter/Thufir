@@ -8,7 +8,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -116,5 +118,39 @@ public class TastytradeClient {
             log.error("Order submission failed (dryRun={}): status={}, body={}", dryRun, response.getStatusCode(), response.getBody());
             throw new RuntimeException("Order submission failed: " + response.getStatusCode());
         }
+    }
+
+    public Map<String, Object> getMarketData(String accessToken, Map<String, String> typeToSymbols) {
+        String url = baseUrl + "/market-data/by-type";
+
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url);
+        typeToSymbols.forEach((type, symbolsCsv) ->
+                builder.queryParam(type, symbolsCsv)
+        );
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        log.info(builder.toUriString());
+
+        ResponseEntity<Map> response = restTemplate.exchange(
+                builder.toUriString(),
+                HttpMethod.GET,
+                entity,
+                Map.class
+        );
+
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = (Map<String, Object>) response.getBody();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) body.get("data");
+            return data != null ? data : new HashMap<>();
+        }
+
+        log.error("Market data fetch failed: status = {}", response.getStatusCode());
+        throw new RuntimeException("Failed to fetch market data from tastytrade");
     }
 }

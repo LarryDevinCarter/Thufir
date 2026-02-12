@@ -12,10 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -181,5 +179,54 @@ public class TastytradeServiceImpl implements TastytradeService {
 
         body.put("legs", legs);
         return body;
+    }
+
+    @Override
+    public Map<String, BigDecimal> getCurrentMarkPrices(Set<String> equitySymbols, Set<String> cryptoBaseSymbols) {
+
+        Map<String, String> params = new HashMap<>();
+
+        if (!equitySymbols.isEmpty()) {
+            String equitiesCsv = equitySymbols.stream()
+                    .map(String::toUpperCase)
+                    .collect(Collectors.joining(","));
+            params.put("equity", equitiesCsv);
+        }
+
+        if (!cryptoBaseSymbols.isEmpty()) {
+            String cryptoCsv = cryptoBaseSymbols.stream()
+                    .map(s -> s.toUpperCase() + "/USD")
+                    .collect(Collectors.joining(","));
+            params.put("cryptocurrency", cryptoCsv);
+        }
+
+        if (params.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, Object> data = tastytradeClient.getMarketData(accessToken, params);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = (List<Map<String, Object>>) data.get("items");
+
+        Map<String, BigDecimal> prices = new HashMap<>();
+
+        if (items != null) {
+            for (Map<String, Object> item : items) {
+                String symbol = (String) item.get("symbol");
+                String markStr = (String) item.get("mark");
+
+                if (markStr != null && !markStr.trim().isEmpty()) {
+                    BigDecimal price = new BigDecimal(markStr.trim());
+                    // Normalize key: remove /USD for crypto
+                    String cleanKey = symbol.endsWith("/USD")
+                            ? symbol.substring(0, symbol.length() - 4)
+                            : symbol;
+                    prices.put(cleanKey.toUpperCase(), price);
+                }
+            }
+        }
+
+        return prices;
     }
 }

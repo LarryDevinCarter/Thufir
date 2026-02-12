@@ -6,6 +6,7 @@ import com.larrydevincarter.thufir.models.entities.Position;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public interface TastytradeService {
 
@@ -22,4 +23,6 @@ public interface TastytradeService {
     Map<String, Object> placeOrderDryRun(OrderRequestDto request);
 
     Map<String, Object> placeOrder(OrderRequestDto request);
+
+    Map<String, BigDecimal> getCurrentMarkPrices(Set<String> equitySymbols, Set<String> cryptoBaseSymbols);
 }
