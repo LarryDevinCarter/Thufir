@@ -21,7 +21,7 @@ Once all 10 categories reach their targets, investing stops completely.
 7. GOOGL/GOOG (treated as one combined category)  
 8. NIKL  
 9. Other stocks (one combined basket category)  
-   - ABEV, AIT, ALKS, ASR, BKR, CHRD, CRUS, CTRA, DEC, EOG, GIB, HLI, HM, IDCC, INTU, LULU, MATX, MNSO, NTES, OVV, RDY, RMD, TSM, TW, UTHR
+   - ABEV, AIT, ALKS, ASR, BKR, CHRD, CRUS, CTRA, DECK, EOG, GIB, HLI, HMY, IDCC, INTU, LULU, MATX, MNSO, NTES, OVV, RDY, RMD, TSM, TW, UTHR
 
 ## Target Cost Basis per Category
 | Category       | Target Cost Basis | Notes                                      |
