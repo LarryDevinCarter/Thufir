@@ -1,6 +1,8 @@
 package com.larrydevincarter.thufir.tools;
 
+import com.larrydevincarter.thufir.models.BuySequenceRecommendation;
 import com.larrydevincarter.thufir.models.OrderLeg;
+import com.larrydevincarter.thufir.models.SingleBuyRecommendation;
 import com.larrydevincarter.thufir.models.dtos.OrderRequestDto;
 import com.larrydevincarter.thufir.models.entities.Position;
 import com.larrydevincarter.thufir.services.TastytradeService;
@@ -158,17 +160,21 @@ public class TastytradeTools {
     }
 
     @Tool("""
-    Get the full sequence of recommended buys to deploy available cash following strict sequential priority rules.
-    Funds ONE category at a time until it reaches or exceeds target before moving to the next.
-    Accepts small overage to hit target with whole shares/crypto blocks.
-    Stops sequence if a category cannot be fully funded with remaining cash.
-    Returns JSON-like string with array of recommendations + summary.
-""")
-    public String getNextBuySequenceRecommendations() {
+                Returns a structured BuySequenceRecommendation object containing the full sequence of recommended buys.
+                Funds ONE category at a time until it reaches or exceeds target before moving to the next.
+                Accepts small overage to hit target with whole shares/crypto blocks.
+                Stops sequence if a category cannot be fully funded with remaining cash.
+                Use when Larry asks for buy recommendations.
+            """)
+    public BuySequenceRecommendation getNextBuySequenceRecommendations() {
         try {
             String pStr = profitGoalTools.getCurrentProfitGoal();
             if ("NOT_SET".equals(pStr)) {
-                return "{\"recommendations\":[], \"message\":\"Profit goal (P) not set yet. Cannot recommend buys.\"}";
+                return BuySequenceRecommendation.builder()
+                        .recommendations(List.of())
+                        .message("Profit goal (P) not set yet. Cannot recommend buys.")
+                        .hasRecommendations(false)
+                        .build();
             }
             BigDecimal P = new BigDecimal(pStr);
 
@@ -179,31 +185,37 @@ public class TastytradeTools {
 
             BigDecimal cashRemaining = new BigDecimal(getAvailableCash());
             if (cashRemaining.compareTo(BigDecimal.valueOf(10)) < 0) {
-                return "{\"recommendations\":[], \"message\":\"Available cash too low (" + cashRemaining + ").\"}";
+                return BuySequenceRecommendation.builder()
+                        .recommendations(List.of())
+                        .message("Available cash too low: $" + cashRemaining)
+                        .hasRecommendations(false)
+                        .build();
             }
 
             Map<String, BigDecimal> targets = createCategoryTargets(P);
             List<String> priority = List.of("NVDA", "BTC", "RKLB", "TSLA", "ETH", "DOGE", "GOOGL/GOOG", "NIKL", "OTHER_BASKET");
             Map<String, BigDecimal> currentMVs = computeCategoryMarketValues(positions);
 
-            List<Map<String, Object>> recommendations = new ArrayList<>();
+            List<SingleBuyRecommendation> recList = new ArrayList<>();
 
             for (String category : priority) {
                 BigDecimal currentMV = currentMVs.getOrDefault(category, BigDecimal.ZERO);
                 BigDecimal target = targets.get(category);
 
-                if (currentMV.compareTo(target) >= 0) continue;
+                if (currentMV.compareTo(target) >= 0) {
+                    continue;
+                }
 
-                Map<String, Object> buyRec = buildBuyToReachTarget(category, cashRemaining, prices, positions, currentMV, target);
+                SingleBuyRecommendation buyRec = buildBuyToReachTarget(category, cashRemaining, prices, positions, currentMV, target);
 
-                if (buyRec == null || buyRec.isEmpty()) {
+                if (buyRec == null) {
                     break;
                 }
 
-                BigDecimal estCost = new BigDecimal((String) buyRec.get("estCost"));
+                BigDecimal estCost = new BigDecimal(buyRec.getEstCost());
                 BigDecimal projectedMV = currentMV.add(estCost);
 
-                recommendations.add(buyRec);
+                recList.add(buyRec);
 
                 cashRemaining = cashRemaining.subtract(estCost);
                 currentMVs.put(category, projectedMV);
@@ -212,33 +224,40 @@ public class TastytradeTools {
                     break;
                 }
 
-                if (cashRemaining.compareTo(BigDecimal.valueOf(10)) < 0) break;
+                if (cashRemaining.compareTo(BigDecimal.valueOf(10)) < 0) {
+                    break;
+                }
             }
 
-            Map<String, Object> result = new HashMap<>();
-            result.put("recommendations", recommendations);
-            result.put("totalToDeploy", new BigDecimal(getAvailableCash()).subtract(cashRemaining).toPlainString());
-            result.put("cashRemainingAfter", cashRemaining.toPlainString());
+            String totalDeployed = new BigDecimal(getAvailableCash()).subtract(cashRemaining).toPlainString();
 
-            String msg = recommendations.isEmpty()
-                    ? "No buys recommended (all categories funded or insufficient cash)."
-                    : recommendations.size() + " sequential buy" + (recommendations.size() > 1 ? "s" : "") + " recommended to reach targets.";
+            String msg;
+            if (recList.isEmpty()) {
+                msg = "No buys recommended (all categories funded or insufficient cash to reach next target).";
+            } else {
+                msg = recList.size() + " sequential buy" + (recList.size() > 1 ? "s" : "") + " recommended to reach targets.";
+            }
 
-            result.put("message", msg);
-
-            return result.toString();
+            return BuySequenceRecommendation.builder()
+                    .recommendations(recList)
+                    .totalToDeploy(totalDeployed)
+                    .cashRemainingAfter(cashRemaining.toPlainString())
+                    .message(msg)
+                    .hasRecommendations(!recList.isEmpty())
+                    .build();
 
         } catch (Exception e) {
-            log.error("Error generating buy sequence", e);
-            return "{\"recommendations\":[], \"message\":\"Error: " + e.getMessage() + "\"}";
+            log.error("Error generating buy sequence object", e);
+            return BuySequenceRecommendation.builder()
+                    .recommendations(List.of())
+                    .message("Error generating recommendations: " + e.getMessage())
+                    .hasRecommendations(false)
+                    .build();
         }
     }
 
-    private Map<String, Object> buildBuyToReachTarget(String category, BigDecimal maxCash, Map<String, BigDecimal> prices,
-                                                      List<Position> positions, BigDecimal currentMV, BigDecimal target) {
-        Map<String, Object> rec = new HashMap<>();
-        rec.put("category", category);
-
+    private SingleBuyRecommendation buildBuyToReachTarget(String category, BigDecimal maxCash, Map<String, BigDecimal> prices,
+                                                          List<Position> positions, BigDecimal currentMV, BigDecimal target) {
         BigDecimal gap = target.subtract(currentMV).max(BigDecimal.ZERO);
         if (gap.compareTo(BigDecimal.ZERO) <= 0) return null;
 
@@ -262,12 +281,14 @@ public class TastytradeTools {
                 cost = qty.multiply(price);
             }
 
-            rec.put("symbol", category + "/USD");
-            rec.put("quantity", qty.toPlainString());
-            rec.put("priceUsed", price.toPlainString());
-            rec.put("estCost", cost.toPlainString());
-            rec.put("isCrypto", true);
-            return rec;
+            return SingleBuyRecommendation.builder()
+                    .category(category)
+                    .symbol(category + "/USD")
+                    .quantity(qty.toPlainString())
+                    .priceUsed(price.toPlainString())
+                    .estCost(cost.toPlainString())
+                    .isCrypto(true)
+                    .build();
         }
 
         BigDecimal price;
@@ -275,7 +296,7 @@ public class TastytradeTools {
 
         if ("GOOGL/GOOG".equals(category)) {
             BigDecimal googlP = prices.get("GOOGL");
-            BigDecimal googP  = prices.get("GOOG");
+            BigDecimal googP = prices.get("GOOG");
             if (googlP == null || googP == null) return null;
 
             String cheaperSym = googlP.compareTo(googP) <= 0 ? "GOOGL" : "GOOG";
@@ -293,7 +314,7 @@ public class TastytradeTools {
                 price = expensivePrice;
             }
         } else if ("OTHER_BASKET".equals(category)) {
-            Set<String> basket = Set.of("ABEV","AIT","ALKS","ASR","BKR","CHRD","CRUS","CTRA","DECK","EOG","GIB","HLI","HMY","IDCC","INTU","LULU","MATX","MNSO","NTES","OVV","RDY","RMD","TSM","TW","UTHR");
+            Set<String> basket = Set.of("ABEV", "AIT", "ALKS", "ASR", "BKR", "CHRD", "CRUS", "CTRA", "DECK", "EOG", "GIB", "HLI", "HMY", "IDCC", "INTU", "LULU", "MATX", "MNSO", "NTES", "OVV", "RDY", "RMD", "TSM", "TW", "UTHR");
             List<Map.Entry<String, BigDecimal>> sorted = basket.stream()
                     .filter(prices::containsKey)
                     .map(s -> Map.entry(s, prices.get(s)))
@@ -322,13 +343,14 @@ public class TastytradeTools {
             cost = sharesNeeded.multiply(price);
         }
 
-        rec.put("symbol", symbolToBuy);
-        rec.put("quantity", sharesNeeded.toPlainString());
-        rec.put("priceUsed", price.toPlainString());
-        rec.put("estCost", cost.toPlainString());
-        rec.put("isCrypto", false);
-
-        return rec;
+        return SingleBuyRecommendation.builder()
+                .category(category)
+                .symbol(symbolToBuy)
+                .quantity(sharesNeeded.toPlainString())
+                .priceUsed(price.toPlainString())
+                .estCost(cost.toPlainString())
+                .isCrypto(false)
+                .build();
     }
 
     private BigDecimal getCryptoBlockSize(BigDecimal price) {
