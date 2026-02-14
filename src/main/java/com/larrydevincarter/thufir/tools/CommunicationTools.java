@@ -27,7 +27,7 @@ public class CommunicationTools {
                 Automatically splits long messages (>1900 chars) into numbered parts to stay safely under Discord's 2000-char limit.
                 Use this for all status updates, recommendations, alerts, etc.
                 Params:
-                • content  → the main message text (short lines, bullets, **bold**, `code` encouraged)
+                • content  → the main message text
                 • urgent   → true only for time-sensitive (profit trigger, major issue)
                 • context  → short label (BUY_NVDA, PROFIT_TRIGGER, PORTFOLIO_UPDATE, etc.)
             """)

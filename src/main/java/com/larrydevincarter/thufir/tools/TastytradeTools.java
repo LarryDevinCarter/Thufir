@@ -267,9 +267,8 @@ public class TastytradeTools {
             BigDecimal price = prices.get(category);
             if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) return null;
 
-            BigDecimal blockSize = getCryptoBlockSize(price);
-            BigDecimal blocksNeeded = gap.add(price.multiply(blockSize).subtract(BigDecimal.ONE))
-                    .divide(price.multiply(blockSize), 0, RoundingMode.CEILING);
+            BigDecimal blockSize = getCryptoBlockSize(price, maxCash);
+            BigDecimal blocksNeeded = gap.divide(price.multiply(blockSize), 0, RoundingMode.CEILING);
 
             BigDecimal qty = blocksNeeded.multiply(blockSize);
             BigDecimal cost = qty.multiply(price);
@@ -330,10 +329,9 @@ public class TastytradeTools {
             price = prices.get(category);
             if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) return null;
         }
-
-        BigDecimal sharesNeeded = gap.add(price.subtract(BigDecimal.ONE))
-                .divide(price, 0, RoundingMode.CEILING);
-
+        log.info("Asset: {}, Gap: {}, Price: {}", category, gap, price);
+        BigDecimal sharesNeeded = gap.divide(price, 0, RoundingMode.CEILING);
+        log.info("SharesNeeded: {}", sharesNeeded);
         BigDecimal cost = sharesNeeded.multiply(price);
 
         if (cost.compareTo(maxCash) > 0) {
@@ -353,13 +351,12 @@ public class TastytradeTools {
                 .build();
     }
 
-    private BigDecimal getCryptoBlockSize(BigDecimal price) {
-        if (price.compareTo(BigDecimal.valueOf(318)) <= 0) return BigDecimal.ONE;
+    private BigDecimal getCryptoBlockSize(BigDecimal price, BigDecimal maxCash) {
+        if (price.compareTo(maxCash) <= 0) return BigDecimal.ONE;
         BigDecimal block = BigDecimal.ONE;
-        BigDecimal threshold = BigDecimal.valueOf(318);
-        while (price.compareTo(threshold) > 0) {
+        while (price.compareTo(maxCash) > 0) {
             block = block.divide(BigDecimal.TEN, 10, RoundingMode.HALF_DOWN);
-            threshold = threshold.multiply(BigDecimal.TEN);
+            maxCash = maxCash.multiply(BigDecimal.TEN);
         }
         return block;
     }
