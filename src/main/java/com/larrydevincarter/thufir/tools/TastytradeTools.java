@@ -74,7 +74,7 @@ public class TastytradeTools {
                     .build();
 
             OrderRequestDto req = OrderRequestDto.builder()
-                    .timeInForce("Day")
+                    .timeInForce(isCrypto ? "IOC" : "Day")
                     .orderType("Market")
                     .legs(List.of(leg))
                     .build();
@@ -103,7 +103,7 @@ public class TastytradeTools {
                     .build();
 
             OrderRequestDto req = OrderRequestDto.builder()
-                    .timeInForce("Day")
+                    .timeInForce(isCrypto ? "IOC" : "Day")
                     .orderType("Market")
                     .legs(List.of(leg))
                     .build();
