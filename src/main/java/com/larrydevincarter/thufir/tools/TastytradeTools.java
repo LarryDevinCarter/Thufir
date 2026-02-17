@@ -150,9 +150,8 @@ public class TastytradeTools {
                     equities.add(s);
                 }
             }
-
             Map<String, BigDecimal> prices = accountService.getCurrentMarkPrices(equities, cryptos);
-            return prices.toString();  // clean: {NVDA=1365.42, BTC=92840.50, ...}
+            return prices.toString();
         } catch (Exception e) {
             log.warn("Price fetch failed for symbols: {}", symbols, e);
             return "Error fetching prices: " + e.getMessage();
@@ -206,16 +205,17 @@ public class TastytradeTools {
                     continue;
                 }
 
-                SingleBuyRecommendation buyRec = buildBuyToReachTarget(category, cashRemaining, prices, positions, currentMV, target);
-
-                if (buyRec == null) {
+                List<SingleBuyRecommendation> buyRecs = buildBuyToReachTarget(category, cashRemaining, prices, positions, currentMV, target);
+                if (buyRecs.isEmpty()) {
                     break;
                 }
 
-                BigDecimal estCost = new BigDecimal(buyRec.getEstCost());
+                BigDecimal estCost = buyRecs.stream()
+                        .map(rec -> new BigDecimal(rec.getEstCost()))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
                 BigDecimal projectedMV = currentMV.add(estCost);
 
-                recList.add(buyRec);
+                recList.addAll(buyRecs);
 
                 cashRemaining = cashRemaining.subtract(estCost);
                 currentMVs.put(category, projectedMV);
@@ -237,7 +237,6 @@ public class TastytradeTools {
             } else {
                 msg = recList.size() + " sequential buy" + (recList.size() > 1 ? "s" : "") + " recommended to reach targets.";
             }
-
             return BuySequenceRecommendation.builder()
                     .recommendations(recList)
                     .totalToDeploy(totalDeployed)
@@ -256,99 +255,134 @@ public class TastytradeTools {
         }
     }
 
-    private SingleBuyRecommendation buildBuyToReachTarget(String category, BigDecimal maxCash, Map<String, BigDecimal> prices,
-                                                          List<Position> positions, BigDecimal currentMV, BigDecimal target) {
+    List<SingleBuyRecommendation> buildBuyToReachTarget(String category, BigDecimal maxCash, Map<String, BigDecimal> prices,
+                                                        List<Position> positions, BigDecimal currentMV, BigDecimal target) {
         BigDecimal gap = target.subtract(currentMV).max(BigDecimal.ZERO);
-        if (gap.compareTo(BigDecimal.ZERO) <= 0) return null;
+        if (gap.compareTo(BigDecimal.ZERO) <= 0) return List.of();
 
         boolean isCrypto = Set.of("BTC", "ETH", "DOGE").contains(category);
+        List<String> symbols;
 
         if (isCrypto) {
-            BigDecimal price = prices.get(category);
-            if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) return null;
+            symbols = List.of(category);
+        } else if ("GOOGL/GOOG".equals(category)) {
+            symbols = List.of("GOOGL", "GOOG");
+        } else if ("OTHER_BASKET".equals(category)) {
+            symbols = List.of("ABEV", "AIT", "ALKS", "ASR", "BKR", "CHRD", "CRUS", "CTRA", "DECK", "EOG", "GIB", "HLI", "HMY", "IDCC", "INTU", "LULU", "MATX", "MNSO", "NTES", "OVV", "RDY", "RMD", "TSM", "TW", "UTHR");
+        } else {
+            symbols = List.of(category);
+        }
 
+        Map<String, BigDecimal> symbolPrices = symbols.stream()
+                .filter(s -> prices.containsKey(s) && prices.get(s).compareTo(BigDecimal.ZERO) > 0)
+                .collect(Collectors.toMap(s -> s, prices::get));
+
+        if (symbolPrices.isEmpty()) return List.of();
+
+        symbols = new ArrayList<>(symbolPrices.keySet());
+
+        Map<String, BigDecimal> symbolMVs = new HashMap<>();
+        for (String s : symbols) {
+            symbolMVs.put(s, getMVForSingleSymbol(positions, s));
+        }
+
+        BigDecimal cash = maxCash;
+        List<SingleBuyRecommendation> recs = new ArrayList<>();
+
+        if (isCrypto) {
+            String sym = symbols.getFirst();
+            BigDecimal price = symbolPrices.get(sym);
             BigDecimal blockSize = getCryptoBlockSize(price, maxCash);
             BigDecimal blocksNeeded = gap.divide(price.multiply(blockSize), 0, RoundingMode.CEILING);
-
             BigDecimal qty = blocksNeeded.multiply(blockSize);
             BigDecimal cost = qty.multiply(price);
-
-            if (cost.compareTo(maxCash) > 0) {
-                BigDecimal maxBlocks = maxCash.divide(price.multiply(blockSize), 0, RoundingMode.FLOOR);
-                if (maxBlocks.compareTo(BigDecimal.ZERO) <= 0) return null;
+            if (cost.compareTo(cash) > 0) {
+                BigDecimal maxBlocks = cash.divide(price.multiply(blockSize), 0, RoundingMode.FLOOR);
+                if (maxBlocks.compareTo(BigDecimal.ZERO) <= 0) return List.of();
                 qty = maxBlocks.multiply(blockSize);
                 cost = qty.multiply(price);
             }
-
-            return SingleBuyRecommendation.builder()
+            recs.add(SingleBuyRecommendation.builder()
                     .category(category)
-                    .symbol(category + "/USD")
+                    .symbol(sym + "/USD")
                     .quantity(qty.toPlainString())
                     .priceUsed(price.toPlainString())
                     .estCost(cost.toPlainString())
                     .isCrypto(true)
-                    .build();
-        }
-
-        BigDecimal price;
-        String symbolToBuy;
-
-        if ("GOOGL/GOOG".equals(category)) {
-            BigDecimal googlP = prices.get("GOOGL");
-            BigDecimal googP = prices.get("GOOG");
-            if (googlP == null || googP == null) return null;
-
-            String cheaperSym = googlP.compareTo(googP) <= 0 ? "GOOGL" : "GOOG";
-            BigDecimal cheaperPrice = googlP.min(googP);
-            BigDecimal expensivePrice = googlP.max(googP);
-
-            BigDecimal cheaperMV = getMVForSingleSymbol(positions, cheaperSym);
-            BigDecimal expensiveMV = getMVForSingleSymbol(positions, cheaperSym.equals("GOOGL") ? "GOOG" : "GOOGL");
-
-            if (cheaperMV.compareTo(expensiveMV.add(expensivePrice)) < 0) {
-                symbolToBuy = cheaperSym;
-                price = cheaperPrice;
-            } else {
-                symbolToBuy = cheaperSym.equals("GOOGL") ? "GOOG" : "GOOGL";
-                price = expensivePrice;
+                    .build());
+        } else if (symbols.size() == 1) {
+            String sym = symbols.getFirst();
+            BigDecimal price = symbolPrices.get(sym);
+            BigDecimal sharesNeeded = gap.divide(price, 0, RoundingMode.CEILING);
+            BigDecimal cost = sharesNeeded.multiply(price);
+            if (cost.compareTo(cash) > 0) {
+                sharesNeeded = cash.divide(price, 0, RoundingMode.FLOOR);
+                if (sharesNeeded.compareTo(BigDecimal.ZERO) <= 0) return List.of();
+                cost = sharesNeeded.multiply(price);
             }
-        } else if ("OTHER_BASKET".equals(category)) {
-            Set<String> basket = Set.of("ABEV", "AIT", "ALKS", "ASR", "BKR", "CHRD", "CRUS", "CTRA", "DECK", "EOG", "GIB", "HLI", "HMY", "IDCC", "INTU", "LULU", "MATX", "MNSO", "NTES", "OVV", "RDY", "RMD", "TSM", "TW", "UTHR");
-            List<Map.Entry<String, BigDecimal>> sorted = basket.stream()
-                    .filter(prices::containsKey)
-                    .map(s -> Map.entry(s, prices.get(s)))
-                    .filter(e -> e.getValue().compareTo(BigDecimal.ZERO) > 0)
-                    .sorted(Map.Entry.comparingByValue())
-                    .toList();
-
-            if (sorted.isEmpty()) return null;
-            symbolToBuy = sorted.get(0).getKey();
-            price = sorted.get(0).getValue();
+            recs.add(SingleBuyRecommendation.builder()
+                    .category(category)
+                    .symbol(sym)
+                    .quantity(sharesNeeded.toPlainString())
+                    .priceUsed(price.toPlainString())
+                    .estCost(cost.toPlainString())
+                    .isCrypto(false)
+                    .build());
         } else {
-            symbolToBuy = category;
-            price = prices.get(category);
-            if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) return null;
+            BigDecimal minPrice = symbolPrices.values().stream().min(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
+            while (gap.compareTo(BigDecimal.ZERO) > 0 && cash.compareTo(minPrice) >= 0) {
+                BigDecimal minMV = Collections.min(symbolMVs.values());
+                Map<String, BigDecimal> finalSymbolMVs = symbolMVs;
+                List<String> candidates = symbols.stream()
+                        .filter(s -> finalSymbolMVs.get(s).compareTo(minMV) == 0)
+                        .sorted(Comparator.comparing(symbolPrices::get))
+                        .toList();
+                if (candidates.isEmpty()) break;
+                String chosen = candidates.getFirst();
+                BigDecimal price = symbolPrices.get(chosen);
+                if (cash.compareTo(price) < 0 || gap.compareTo(price) < 0) break;
+                symbolMVs.put(chosen, symbolMVs.get(chosen).add(price));
+                cash = cash.subtract(price);
+                gap = gap.subtract(price);
+            }
+            Map<String, BigDecimal> buys = new HashMap<>();
+            gap = target.subtract(currentMV);
+            symbolMVs = new HashMap<>();
+            for (String s : symbols) {
+                symbolMVs.put(s, getMVForSingleSymbol(positions, s));
+            }
+            while (gap.compareTo(BigDecimal.ZERO) > 0 && cash.compareTo(minPrice) >= 0) {
+                BigDecimal minMV = Collections.min(symbolMVs.values());
+                Map<String, BigDecimal> finalSymbolMVs1 = symbolMVs;
+                List<String> candidates = symbols.stream()
+                        .filter(s -> finalSymbolMVs1.get(s).compareTo(minMV) == 0)
+                        .sorted(Comparator.comparing(symbolPrices::get))
+                        .toList();
+                if (candidates.isEmpty()) break;
+                String chosen = candidates.getFirst();
+                BigDecimal price = symbolPrices.get(chosen);
+                if (cash.compareTo(price) < 0 || gap.compareTo(BigDecimal.ZERO) < 0) break;
+                buys.merge(chosen, BigDecimal.ONE, BigDecimal::add);
+                symbolMVs.put(chosen, symbolMVs.get(chosen).add(price));
+                cash = cash.subtract(price);
+                gap = gap.subtract(price);
+            }
+            for (Map.Entry<String, BigDecimal> entry : buys.entrySet()) {
+                String sym = entry.getKey();
+                BigDecimal qty = entry.getValue();
+                BigDecimal price = symbolPrices.get(sym);
+                BigDecimal cost = qty.multiply(price);
+                recs.add(SingleBuyRecommendation.builder()
+                        .category(category)
+                        .symbol(sym)
+                        .quantity(qty.toPlainString())
+                        .priceUsed(price.toPlainString())
+                        .estCost(cost.toPlainString())
+                        .isCrypto(false)
+                        .build());
+            }
         }
-        log.info("Asset: {}, Gap: {}, Price: {}", category, gap, price);
-        BigDecimal sharesNeeded = gap.divide(price, 0, RoundingMode.CEILING);
-        log.info("SharesNeeded: {}", sharesNeeded);
-        BigDecimal cost = sharesNeeded.multiply(price);
-
-        if (cost.compareTo(maxCash) > 0) {
-            BigDecimal maxShares = maxCash.divide(price, 0, RoundingMode.FLOOR);
-            if (maxShares.compareTo(BigDecimal.ZERO) <= 0) return null;
-            sharesNeeded = maxShares;
-            cost = sharesNeeded.multiply(price);
-        }
-
-        return SingleBuyRecommendation.builder()
-                .category(category)
-                .symbol(symbolToBuy)
-                .quantity(sharesNeeded.toPlainString())
-                .priceUsed(price.toPlainString())
-                .estCost(cost.toPlainString())
-                .isCrypto(false)
-                .build();
+        return recs;
     }
 
     private BigDecimal getCryptoBlockSize(BigDecimal price, BigDecimal maxCash) {
