@@ -116,9 +116,9 @@ public class TastytradeServiceImpl implements TastytradeService {
                 throw new IllegalStateException("Mark price missing; ensure include-marks=true is used.");
             }
 
-            Integer multiplier = (Integer) raw.get("multiplier");
+            Double multiplier = Double.valueOf((String) raw.get("multiplier"));
             if (multiplier == null) {
-                multiplier = 1;
+                multiplier = 1.0;
             }
             BigDecimal mult = new BigDecimal(multiplier);
 
