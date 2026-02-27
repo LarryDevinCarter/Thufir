@@ -1,5 +1,6 @@
 package com.larrydevincarter.thufir.services;
 
+import com.larrydevincarter.thufir.models.AccountBalance;
 import com.larrydevincarter.thufir.models.dtos.OrderRequestDto;
 import com.larrydevincarter.thufir.models.entities.Position;
 
@@ -14,7 +15,7 @@ public interface TastytradeService {
 
     void forceRefresh();
 
-    Map<String, Object> getCurrentBalances();
+    AccountBalance getCurrentBalances();
 
     BigDecimal getAvailableCash();
 

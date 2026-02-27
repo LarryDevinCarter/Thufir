@@ -1,5 +1,6 @@
 package com.larrydevincarter.thufir.tools;
 
+import com.larrydevincarter.thufir.models.AccountBalance;
 import com.larrydevincarter.thufir.models.BuySequenceRecommendation;
 import com.larrydevincarter.thufir.models.OrderLeg;
 import com.larrydevincarter.thufir.models.SingleBuyRecommendation;
@@ -37,7 +38,7 @@ public class TastytradeTools {
     @Tool("Get full current account balances snapshot as JSON-like string")
     public String getFullBalances() {
         try {
-            Map<String, Object> balances = accountService.getCurrentBalances();
+            AccountBalance balances = accountService.getCurrentBalances();
             return balances.toString();
         } catch (Exception e) {
             return "Error: " + e.getMessage();

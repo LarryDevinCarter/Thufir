@@ -1,10 +1,13 @@
 package com.larrydevincarter.thufir.services.impl;
 
-import com.larrydevincarter.thufir.clients.TastytradeClient;
+import com.larrydevincarter.thufir.models.AccountBalance;
+import com.larrydevincarter.thufir.tastytrade.clients.TastytradeClient;
 import com.larrydevincarter.thufir.models.dtos.OrderRequestDto;
 import com.larrydevincarter.thufir.models.entities.Position;
 import com.larrydevincarter.thufir.repositories.PositionRepository;
 import com.larrydevincarter.thufir.services.TastytradeService;
+import com.larrydevincarter.thufir.tastytrade.controllers.TastytradeController;
+import com.larrydevincarter.thufir.models.dtos.TastytradeTokenResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +24,7 @@ import java.util.stream.Collectors;
 public class TastytradeServiceImpl implements TastytradeService {
 
     private final TastytradeClient tastytradeClient;
+    private final TastytradeController tastytradeController;
     private final PositionRepository positionRepository;
 
     @Value("${tastytrade.live.account-number}")
@@ -46,10 +50,10 @@ public class TastytradeServiceImpl implements TastytradeService {
 
     private void refreshAccessToken() {
         try {
-            Map<String, Object> tokenResponse = tastytradeClient.refreshToken(clientId, clientSecret, refreshToken);
+            TastytradeTokenResponseDto tokenResponse = tastytradeController.refreshToken(clientId, clientSecret, refreshToken);
 
-            accessToken = (String) tokenResponse.get("access_token");
-            Integer expiresIn = (Integer) tokenResponse.get("expires_in");  // usually 900
+            accessToken = tokenResponse.getAccessToken();
+            Integer expiresIn = tokenResponse.getExpiresIn();
             tokenExpiry = LocalDateTime.now().plusSeconds(expiresIn != null ? expiresIn : 900);
 
             log.info("Tastytrade access token refreshed, expires at {}", tokenExpiry);
@@ -65,19 +69,19 @@ public class TastytradeServiceImpl implements TastytradeService {
     }
 
     @Override
-    public Map<String, Object> getCurrentBalances() {
+    public AccountBalance getCurrentBalances() {
         getAccessToken();
 
         if (configuredAccountNumber == null) {
             throw new IllegalStateException("No account number available");
         }
-        return tastytradeClient.getBalances(accessToken, configuredAccountNumber);
+        return tastytradeController.getBalances(accessToken, configuredAccountNumber);
     }
 
     @Override
     public BigDecimal getAvailableCash() {
-        Map<String, Object> balances = getCurrentBalances();
-        return parseBigDecimal(balances.get("equity-buying-power"));
+        AccountBalance balances = getCurrentBalances();
+        return parseBigDecimal(balances.equityBuyingPower());
     }
 
     @Override

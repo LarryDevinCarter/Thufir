@@ -1,5 +1,9 @@
-package com.larrydevincarter.thufir.clients;
+package com.larrydevincarter.thufir.tastytrade.clients;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.larrydevincarter.thufir.models.AccountBalance;
+import com.larrydevincarter.thufir.models.dtos.AccountBalanceResponseDto;
+import com.larrydevincarter.thufir.models.dtos.TastytradeTokenResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,11 +24,12 @@ import java.util.Map;
 public class TastytradeClient {
 
     private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${tastytrade.live.base-url}")
     private String baseUrl;
 
-    public Map<String, Object> refreshToken(String clientId, String clientSecret, String refreshToken) {
+    public TastytradeTokenResponseDto refreshToken(String clientId, String clientSecret, String refreshToken) {
         String url = baseUrl + "/oauth/token";
 
         HttpHeaders headers = new HttpHeaders();
@@ -38,7 +43,7 @@ public class TastytradeClient {
 
         HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(form, headers);
 
-        ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
+        ResponseEntity<TastytradeTokenResponseDto> response = restTemplate.postForEntity(url, request, TastytradeTokenResponseDto.class);
 
         if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
             log.debug("Token refresh successful");
@@ -48,8 +53,7 @@ public class TastytradeClient {
             throw new RuntimeException("Tastytrade token refresh failed: " + response.getStatusCode());
         }
     }
-
-    public Map<String, Object> getBalances(String accessToken, String accountNumber) {
+    public AccountBalance getBalances(String accessToken, String accountNumber) {
         String url = baseUrl + "/accounts/" + accountNumber + "/balances";
 
         HttpHeaders headers = new HttpHeaders();
@@ -57,21 +61,15 @@ public class TastytradeClient {
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+        ResponseEntity<AccountBalanceResponseDto> response = restTemplate.exchange(url, HttpMethod.GET, entity, AccountBalanceResponseDto.class);
 
         if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> body = response.getBody();
-            @SuppressWarnings("unchecked")
-            Map<String, Object> data = (Map<String, Object>) body.get("data");
-            if (data != null) {
-                return data;
-            }
+            return response.getBody().data();
         }
         log.error("Failed to fetch balances for account {}: status={}", accountNumber, response.getStatusCode());
         throw new RuntimeException("Failed to fetch tastytrade balances for account " + accountNumber);
     }
-
+    //TODO: Working here
     public List<Map<String, Object>> getPositions(String accessToken, String accountNumber) {
         String url = baseUrl + "/accounts/" + accountNumber + "/positions?include-marks=true";
 
